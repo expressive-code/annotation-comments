@@ -1,0 +1,42 @@
+{
+  "name": "root",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm -r --stream build",
+    "lint": "eslint . && markdownlint **/*.md --ignore **/node_modules",
+    "coverage": "pnpm -r --no-bail --workspace-concurrency 1 coverage",
+    "test": "pnpm -r --no-bail --workspace-concurrency 1 test-short",
+    "test:ecosystem-ci": "pnpm test -- --ecosystem-ci",
+    "validate": "pnpm i && pnpm build && pnpm test && pnpm lint",
+    "bump": "changeset version && pnpm i",
+    "release": "pnpm validate && pnpm bump && changeset publish",
+    "ci-version": "changeset version && pnpm install --no-frozen-lockfile",
+    "ci-publish": "pnpm build && pnpm test && pnpm lint && changeset publish"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@changesets/cli": "^2.27.7",
+    "@types/node": "20",
+    "@typescript-eslint/eslint-plugin": "6",
+    "@typescript-eslint/parser": "6",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-deprecation": "^3.0.0",
+    "eslint-plugin-no-only-tests": "^3.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "eslint-plugin-redundant-undefined": "^1.0.0",
+    "markdownlint-cli": "^0.41.0",
+    "prettier": "^3.3.3",
+    "tsup": "^8.2.4",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": "^14.15.0 || >=16.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.9+sha512.499434c9d8fdd1a2794ebf4552b3b25c0a633abcee5bb15e7b5de90f32f47b513aca98cd5cfd001c31f0db454bc3804edccd578501e4ca293a6816166bbd9f81"
+}
