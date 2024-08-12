@@ -47,14 +47,14 @@ Annotation tags consist of the following parts:
 - The **opening sequence** `[!`
 - An **annotation name** registered by the installed plugins, e.g. `note`, `mark`, `ins`, etc.
   - For compatibility with the Shiki transformer syntax, the annotation name can optionally be prefixed by the word `code` and a space, e.g. `code note`, `code mark`, `code ins`, etc.
-- An **optional search query** preceded by a colon, with the following query types being available:
+- An **optional target search query** preceded by a colon, with the following query types being available:
   - `:simple strings without quotes`
-  - `:'single-quoted strings'` (for more complex text with special characters like `:`)
+  - `:'single-quoted strings'` (useful to search for numbers that would otherwise be interpreted as target ranges, or terms that include special characters like `:`)
   - `:"double-quoted strings"` (see above)
   - `:/regex|regular expressions?/` (for complex search patterns)
-- An **optional target range modifier**, e.g. `:3`, `:-1`, `:0`, etc.
-  - If present, it determines how many lines or search query matches before or after the annotation are targeted
-  - If omitted, the annotation targets only 1 line or search query match. Depending on the location of the annotation, this may be above, below, or on the line containing the annotation itself
+- An **optional relative target range**, e.g. `:3`, `:-1`, `:0`, etc.
+  - If present, it determines how many lines or target search query matches before or after the annotation are targeted
+  - If omitted, the annotation targets only 1 line or target search query match. Depending on the location of the annotation, this may be above, below, or on the line containing the annotation itself
 - The **closing sequence** `]`
 
 ### Annotation content
@@ -155,7 +155,7 @@ This ensures that your code remains valid and functional, even if the annotation
 
 ### A supported comment syntax must be used
 
-Expressive Code supports most popular programming languages, so you can use the comment syntax that feels best to you and matches your codebase.
+The `annotation-comments` library supports most popular programming languages, so you can use the comment syntax that feels best to you and matches your codebase.
 
 Single-line comment syntaxes:
 
@@ -172,9 +172,9 @@ Multi-line comment syntaxes:
 - `(* ... *)` (Pascal, ML, F#, etc.)
 - `--[[ ... ]]` (Lua)
 
-Tip: Although Expressive Code allows you to use any of the supported comment syntaxes regardless of the actual language of your code snippet, it is still recommended to use the proper syntax to ensure that your plaintext code remains valid.
+Tip: Although `annotation-comments` allows you to use any of the supported comment syntaxes regardless of the actual language of your code snippet, it is still recommended to use the proper syntax to ensure that your plaintext code remains valid.
 
-Note: Accurately detecting single-line and multi-line comments in all supported programming languages is hard. Using full-blown language parsers would significantly slow down processing and increase the bundle size. To avoid this, Expressive Code uses a simpler heuristic to check for a surrounding comment whenever a valid annotation tag is found.
+Note: Accurately detecting single-line and multi-line comments in all supported programming languages is hard. Using full-blown language parsers would significantly slow down processing and increase the bundle size. To avoid this, `annotation-comments` uses a simpler heuristic to check for a surrounding comment whenever a valid annotation tag is found.
 
 ### Annotation tags must be placed at the beginning
 
@@ -322,18 +322,79 @@ Note: Accurately detecting single-line and multi-line comments in all supported 
 
 ## Processing logic
 
-When processing your code, Expressive Code will:
+```ts
+import { parseAnnotationComments } from 'annotation-comments';
 
-- Go through your code line by line, looking for strings that match the annotation comment syntax. If a match is found, it will:
-  - Extract the annotation name, optional search query, and optional target range modifier from the annotation tag
-  - Ensure that the annotation name is registered by any of the installed plugins. If not, it will skip the tag and continue searching
+const code = `
+// [!note] This is a note annotation.
+console.log('Some code');
+`;
+
+const codeLines = code.trim().split(/\r?\n/);
+
+const annotationComments = parseAnnotationComments({
+  codeLines,
+  validateAnnotationName: (name) => name === 'note',
+});
+
+removeAnnotationComments({
+  annotationComments,
+  codeLines,
+  updateTargetRanges: true,
+});
+```
+
+### parseAnnotationComments()
+
+This function is the main entry point for processing annotation comments in code snippets.
+
+It takes the following parameters:
+
+```ts
+type ParseAnnotationCommentsOptions = {
+  codeLines: string[],
+  validateAnnotationName?: (name: string) => boolean,
+}
+```
+
+Its return value is an array of `AnnotationComment` objects:
+
+```ts
+type AnnotationComment = {
+  name: string,
+  targetSearchQuery?: string,
+  relativeTargetRange?: number,
+  rawTag: string,
+  contents: string[],
+  commentRange: SourceRange,
+  tagRange: SourceRange,
+  contentRanges: SourceRange[],
+  targetRanges: SourceRange[],
+}
+
+type SourceRange = {
+  startLine: number,
+  endLine: number,
+  // For inline ranges, startCol and endCol are also set
+  startCol?: number,
+  endCol?: number,
+}
+```
+
+The function follows these steps to process the code:
+
+#### Step 1: Parsing the code to find all annotation comments
+
+- The function goes through the given code line by line, looking for strings that match the annotation comment syntax. If a match is found, it will:
+  - Extract the annotation name, optional target search query, and optional relative target range from the annotation tag
   - Ensure that the current annotation tag has not been ignored by an ´ignore-tags` directive. If it has, it will skip the tag and continue searching
+  - If given, call the `validateAnnotationName` handler function to check if the annotation name is valid. If this function returns `false`, skip the tag and continue searching
   - **Handle the current annotation tag if it's inside a single-line comment:** Try to find the beginning sequence of a single-line comment directly before the annotation tag, with no non-whitespace character before and after the beginning sequence. If found, it will:
     - Mark the location of the beginning sequence as beginning of the comment
     - Support chaining of single-line comments on the same line
       - After the current annotation tag, look for a repetition of the same comment beginning sequence + annotation tag syntax. If found, this is a case of chaining, so mark the location of the next beginning sequence as the end of the current comment.
       - If no chaining is found, mark the end of the line as the current end of the comment (this may change later)
-    - Add any text after the annotation tag until the current end of the comment to the annotation's **content**
+    - Add any text after the annotation tag until the current end of the comment to the annotation's **contents**
     - If there was only whitespace before the beginning of the comment (= the comment was on its own line), and no chaining was detected (= end of comment matches end of line), try to expand the comment end location and annotation content to all subsequent lines until a line is found that either doesn't start with the same single-line comment beginning sequence (only preceded by optional whitespace characters), that starts with another valid annotation tag, or that has `---` as its only text content.
     - End processing the current annotation tag and continue searching for the next one
   - **Handle the current annotation tag if it's inside a multi-line comment:** No single-line comment was found, so now try to find a matching pair of beginning and ending sequence of a supported multi-line comment syntax around the match:
@@ -351,39 +412,89 @@ When processing your code, Expressive Code will:
         - If the comment starts and ends on the same line, and there is non-whitespace content both before and after the comment, skip processing the current annotation tag and continue searching for the next one
       - Check rule "Comments spanning multiple lines must not share any lines with code"
         - If the comment starts and ends on different lines, and there is non-whitespace content either before the start or after the end of the comment, skip processing the current annotation tag and continue searching for the next one
-      - Determine the inner bounds of the current annotation and its content
-        - Walk backwards from before the annotation tag until either the beginning of the comment or the beginning of the line is reached
-        - Walk forwards from after the annotation tag until either another tag after a newline is found, the `---` terminator line with only whitespace around is found, or the end of the comment is reached
-- Applying targeting rules
-  - ...
-- Removing an annotation tag from the code the comment syntax and the 
-  - A function that removes any 
-    - If the comment was ended by the special `---` terminator line, include it in the outer range to be removed
-    - Remove the entire outer range of the comment from the source code
-    - Remove any now trailing whitespace from the line where the comment started
-    - If removal of the comment caused the starting line to be empty, remove it as well
-    - If the comment ended on a different line, and its removal caused the ending line to be empty, remove it as well
+      - Finish processing the current annotation tag and continue searching for the next one
+
+#### Step 2: Finding the targets of all annotations
+
+- Now, the function goes through all identified annotation comments and does the following:
+  - If the annotation has **no relative target range** given, automatically determine it:
+    - If the annotation has **no target search query**, it attempts to target full lines:
+      - If the **annotation comment is on the same line as content** (= annotation start line contains content other than whitespace or other annotation comments), the target range is the annotation comment line.
+      - Otherwise, find the first line above and first line below that don't fully consist of annotation comments
+        - If the **line below has content**, it is the target range.
+        - Otherwise, if the **line above has content**, it is the target range.
+        - Otherwise (**both lines are empty**), there is no target range (same as the relative range `:0`).
+    - Otherwise, the annotation **has a target search query**, so determine the search direction:
+      - If the **annotation comment is on the same line as content** (= annotation start line contains content other than whitespace or other annotation comments), the direction depends on where the content is in relation to the comment.
+      - Otherwise, find the first line above and first line below that don't fully consist of annotation comments
+        - If the **line above has content** and the **line below is empty**, the relative range is `:-1`.
+        - Otherwise, the relative range is `:1`.
+  - If a target search query is present, **perform the search** to determine the target range(s):
+    - The target search query can be a simple string, a single-quoted string, a double-quoted string, or a regular expression. Regular expressions can optionally contain capture groups, which will then be used to determine the target range(s) instead of the full match.
+    - The search is performed line by line, starting at the start or end of the annotation comment and going in the direction determined by the relative target range that was either given or automatically determined as described above.
+    - Before searching a line for matches, all characters that lie within the `outerRange` of any annotation comment are removed from the line. If matches are found, the matched ranges are adjusted to include the removed characters.
+    - Each match is added to the `targetRanges` until the number of matches equals the absolute value of the relative target range, or the end of the code is reached.
+    - In the case of regular expressions with capture groups, a single match can result in multiple target ranges, one for each capture group.
+
+### removeAnnotationComments()
+
+This function can be used to remove the parsed annotation comments from the code lines. You can either let it perform the edits in the given code lines array, or provide custom handlers to control the removal process.
+
+It takes the following parameters:
+
+```ts
+type RemoveAnnotationCommentsOptions = {
+  annotationComments: AnnotationComment[],
+  codeLines: string[],
+  updateTargetRanges?: boolean,
+  handleRemoveLine?: ({
+    commentBeingRemoved: AnnotationComment
+    codeLines: string[]
+    lineIndex: number
+  }) => boolean,
+  handleRemoveInlineRange?: ({
+    commentBeingRemoved: AnnotationComment
+    codeLines: string[]
+    lineIndex: number
+    startCol: number
+    endCol: number
+  }) => boolean,
+}
+```
+
+All edits will be carried out in reverse order (from the last annotation comment to the first) to avoid having to update the locations of all remaining annotations after each edit.
+
+If the optional property `updateTargetRanges` is set to `true`, the target ranges of the annotations will be updated to reflect the changes made to the code lines. This is useful if you want to use the target ranges for further processing after the annotations have been removed.
+
+If given, the optional handlers `handleRemoveLine` and `handleRemoveInlineRange` will be called during the removal process. They can return `true` to indicate that the default removal logic (which edits the given `codeLines` array in place) should be skipped for the current line or inline range.
+
+The logic used to determine the edits is as follows:
+
+- If the comment was ended by the special `---` terminator line, include it in the outer range to be removed
+- Remove the entire outer range of the comment from the source code
+- Remove any now trailing whitespace from the line where the comment started
+- If removal of the comment caused the starting line to be empty, remove it as well
+- If the comment ended on a different line, and its removal caused the ending line to be empty, remove it as well
 
 ## Troubleshooting
 
 ### Fixing an annotation that doesn't get processed
 
-If an annotation you've added to your code does not get processed by Expressive Code, check if the following conditions are met:
+If an annotation you've added to your code does not get processed by `annotation-comments`, check if the following conditions are met:
 
 - Does your annotation tag use the [correct syntax](#annotation-tags)?
 - Is your annotation tag placed inside a comment that [follows the guidelines](#adding-annotations-to-your-code)?
-- Is the plugin that provides the annotation installed and added to your Expressive Code configuration?
-- Is the annotation name inside the tag spelled correctly according to the plugin's documentation?
+- If the optional `validateAnnotationName` handler is used, does it return `true` for the annotation name you've used?
 
 ### Opting out of annotation processing
 
-You may want to prevent Expressive Code from processing annotation comments in certain parts of your code. This can be useful if you're writing a guide about using annotation comments themselves, or if the heuristic used by Expressive Code incorrectly recognizes parts of your code as annotation comments.
+You may want to prevent `annotation-comments` from processing annotation comments in certain parts of your code. This can be useful if you're writing a guide about using annotation comments themselves, or if the heuristic used by `annotation-comments` incorrectly recognizes parts of your code as annotation comments.
 
 To opt out, insert a new line in your code that only contains the special tag `[!ignore-tags]` in a comment:
 
 - The base syntax `[!ignore-tags]` will ignore all tags on the next line.
 - You can optionally specify the tag names to ignore, e.g. `[!ignore-tags:note,ins]` will ignore the next match of each tag name.
-- You can optionally add a target range modifier:
+- You can optionally add a relative target range:
   - This will ignore all tags in the given amount of lines, e.g. `[!ignore-tags:3]` will ignore all tags on the next 3 lines.
   - If tag names were also specified, it will ignore a certain amount of matches, e.g. `[!ignore-tags:note:5]` will ignore the next 5 matches of the `note` tag.
 
