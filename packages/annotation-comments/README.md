@@ -49,7 +49,8 @@ Annotation tags consist of the following parts:
   - For compatibility with the Shiki transformer syntax, the annotation name can optionally be prefixed by the word `code` and a space, e.g. `code note`, `code mark`, `code ins`, etc.
 - An **optional target search query** preceded by a colon, with the following query types being available:
   - `:simple strings without quotes`
-  - `:'single-quoted strings'` (useful to search for numbers that would otherwise be interpreted as target ranges, or terms that include special characters like `:`)
+  - `:'single-quoted strings'` (useful to search for numbers that would otherwise be interpreted as target ranges, or terms that include special characters like `:` or `]`)
+    - to escape the same type of quotes inside the string, use a backslash, e.g. `:'single-quoted strings with \'escaped quotes\''`
   - `:"double-quoted strings"` (see above)
   - `:/regex|regular expressions?/` (for complex search patterns)
 - An **optional relative target range**, e.g. `:3`, `:-1`, `:0`, etc.
