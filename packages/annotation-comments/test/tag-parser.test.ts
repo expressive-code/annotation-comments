@@ -1,3 +1,4 @@
+import type { AnnotationTag } from 'annotation-comments'
 import { describe, expect, test } from 'vitest'
 import { parseAnnotationTags } from '../src/internal/tag-parser'
 
@@ -15,194 +16,191 @@ console.log('Some code');
 		).toEqual([])
 	})
 
-	test('Name only: `[!tag]`', () => {
-		expect(
-			getTags(`
-// [!some-tag] This is a simple tag.
-console.log('Some code'); // [!end-of-line]
-
-/*
-[!start-of-line]
-*/
-			`)
-		).toMatchObject([
-			{
-				name: 'some-tag',
-				rawTag: '[!some-tag]',
-				relativeTargetRange: undefined,
+	describe('Name only', () => {
+		test(`[!tag]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
 				targetSearchQuery: undefined,
-				location: {
-					startLineIndex: 0,
-					endLineIndex: 0,
-					startColIndex: 3,
-					endColIndex: 14,
-				},
-			},
-			{
-				name: 'end-of-line',
-				rawTag: '[!end-of-line]',
 				relativeTargetRange: undefined,
-				targetSearchQuery: undefined,
-				location: {
-					startLineIndex: 1,
-					endLineIndex: 1,
-					startColIndex: 29,
-					endColIndex: 43,
-				},
-			},
-			{
-				name: 'start-of-line',
-				rawTag: '[!start-of-line]',
-				relativeTargetRange: undefined,
-				targetSearchQuery: undefined,
-				location: {
-					startLineIndex: 4,
-					endLineIndex: 4,
-					startColIndex: 0,
-					endColIndex: 16,
-				},
-			},
-		])
+			})
+		})
 	})
 
-	test('With relative target range: `[!tag:3]`, `[!tag:-2]`', () => {
-		expect(
-			getTags(`
-// [!tag:3] This is a tag with a relative target range.
-console.log('Some code'); // [!lookback-range:-2]
-			`)
-		).toMatchObject([
-			{
-				name: 'tag',
-				rawTag: '[!tag:3]',
+	describe('With relative target range', () => {
+		test(`[!positive-range:3]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'positive-range',
+				targetSearchQuery: undefined,
 				relativeTargetRange: 3,
+			})
+		})
+
+		test(`[!negative-range:-2]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'negative-range',
 				targetSearchQuery: undefined,
-				location: {
-					startLineIndex: 0,
-					endLineIndex: 0,
-					startColIndex: 3,
-					endColIndex: 11,
-				},
-			},
-			{
-				name: 'lookback-range',
-				rawTag: '[!lookback-range:-2]',
 				relativeTargetRange: -2,
-				targetSearchQuery: undefined,
-				location: {
-					startLineIndex: 1,
-					endLineIndex: 1,
-					startColIndex: 29,
-					endColIndex: 49,
-				},
-			},
-		])
+			})
+		})
 	})
 
-	test('With unquoted target search query: `[!tag:search-term]`', () => {
-		expect(
-			getTags(`
-// [!tag:search-term] This is a tag with a plaintext target search query.
-console.log('Some code'); // [!search:it can contain chars like .,;?!- as well]
-			`)
-		).toMatchObject([
-			{
+	describe('With unquoted target search query', () => {
+		test(`[!tag:search-term]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
 				name: 'tag',
-				rawTag: '[!tag:search-term]',
-				relativeTargetRange: undefined,
 				targetSearchQuery: 'search-term',
-				location: {
-					startLineIndex: 0,
-					endLineIndex: 0,
-					startColIndex: 3,
-					endColIndex: 21,
-				},
-			},
-			{
-				name: 'search',
-				rawTag: '[!search:it can contain chars like .,;?!- as well]',
 				relativeTargetRange: undefined,
-				targetSearchQuery: 'it can contain chars like .,;?!- as well',
-				location: {
-					startLineIndex: 1,
-					endLineIndex: 1,
-					startColIndex: 29,
-					endColIndex: 79,
-				},
-			},
-		])
+			})
+		})
+
+		test(`[!tag:term with spaces and chars like .,;?!"'/-]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
+				targetSearchQuery: `term with spaces and chars like .,;?!"'/-`,
+				relativeTargetRange: undefined,
+			})
+		})
 	})
 
-	test('With unquoted target search query and target range: `[!tag:search-term:5]`', () => {
-		expect(
-			getTags(`
-// [!tag:search-term:5] This is a tag with a plaintext target search query and relative target range.
-console.log('Some code'); // [!search:it can contain chars like .,;?!- as well:-2]
-			`)
-		).toMatchObject([
-			{
+	describe('With unquoted target search query and target range', () => {
+		test(`[!tag:search-term:5]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
 				name: 'tag',
-				rawTag: '[!tag:search-term:5]',
+				targetSearchQuery: 'search-term',
 				relativeTargetRange: 5,
-				targetSearchQuery: 'search-term',
-				location: {
-					startLineIndex: 0,
-					endLineIndex: 0,
-					startColIndex: 3,
-					endColIndex: 23,
-				},
-			},
-			{
-				name: 'search',
-				rawTag: '[!search:it can contain chars like .,;?!- as well:-2]',
+			})
+		})
+
+		test(`[!tag:term with spaces and chars like .;/"'?!-, too:-2]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
+				targetSearchQuery: `term with spaces and chars like .;/"'?!-, too`,
 				relativeTargetRange: -2,
-				targetSearchQuery: 'it can contain chars like .,;?!- as well',
-				location: {
-					startLineIndex: 1,
-					endLineIndex: 1,
-					startColIndex: 29,
-					endColIndex: 82,
-				},
-			},
-		])
+			})
+		})
 	})
 
-	test('With double-quoted target search query: `[!tag:"search term"]`', () => {
-		expect(
-			getTags(`
-// [!tag:"search term"] This is a tag with a double-quoted target search query.
-console.log('Some code'); // [!search:"it can contain chars like .,;:?!- as well"]
-			`)
-		).toMatchObject([
-			{
+	describe('With quoted target search query', () => {
+		test(`[!tag:"double-quoted term"]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
 				name: 'tag',
-				rawTag: '[!tag:"search term"]',
+				targetSearchQuery: `"double-quoted term"`,
 				relativeTargetRange: undefined,
-				targetSearchQuery: '"search term"',
-				location: {
-					startLineIndex: 0,
-					endLineIndex: 0,
-					startColIndex: 3,
-					endColIndex: 23,
-				},
-			},
-			{
-				name: 'search',
-				rawTag: '[!search:"it can contain chars like .,;:?!- as well"]',
+			})
+		})
+
+		test(`[!tag:'single-quoted term']`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
+				targetSearchQuery: `'single-quoted term'`,
 				relativeTargetRange: undefined,
-				targetSearchQuery: '"it can contain chars like .,;:?!- as well"',
-				location: {
-					startLineIndex: 1,
-					endLineIndex: 1,
-					startColIndex: 29,
-					endColIndex: 82,
-				},
-			},
-		])
+			})
+		})
+
+		test(`[!tag:"double-quoted term with 'single quotes' inside"]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
+				targetSearchQuery: `"double-quoted term with 'single quotes' inside"`,
+				relativeTargetRange: undefined,
+			})
+		})
+
+		test(`[!tag:'single-quoted term with "double quotes" inside']`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
+				targetSearchQuery: `'single-quoted term with "double quotes" inside'`,
+				relativeTargetRange: undefined,
+			})
+		})
+
+		test(`[!tag:"escaped \\"same style quotes\\" inside"]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
+				targetSearchQuery: `"escaped \\"same style quotes\\" inside"`,
+				relativeTargetRange: undefined,
+			})
+		})
+
+		test(`[!tag:"wild / ' mix / of:3] chars"]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
+				targetSearchQuery: `"wild / ' mix / of:3] chars"`,
+				relativeTargetRange: undefined,
+			})
+		})
 	})
+
+	describe('With quoted target search query and target range', () => {
+		test(`[!tag:"double-quoted term":10]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
+				targetSearchQuery: `"double-quoted term"`,
+				relativeTargetRange: 10,
+			})
+		})
+
+		test(`[!tag:'single-quoted term':-5]`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name,
+				name: 'tag',
+				targetSearchQuery: `'single-quoted term'`,
+				relativeTargetRange: -5,
+			})
+		})
+	})
+
+	function performTagTest(test: Required<Omit<AnnotationTag, 'location'>>) {
+		const codeLines = splitCodeLines(`
+// ${test.rawTag} Tag in a single-line comment
+console.log('Some code'); // ${test.rawTag} Tag at the end of a line
+/*
+${test.rawTag} Tag in a multi-line comment
+*/
+		`)
+		// Build expected result by searching the raw tag in the code lines
+		const expected = codeLines.reduce((acc, line, lineIndex) => {
+			let startIndex = line.indexOf(test.rawTag)
+			while (startIndex !== -1) {
+				acc.push({
+					name: test.name,
+					rawTag: test.rawTag,
+					relativeTargetRange: test.relativeTargetRange,
+					targetSearchQuery: test.targetSearchQuery,
+					location: {
+						startLineIndex: lineIndex,
+						endLineIndex: lineIndex,
+						startColIndex: startIndex,
+						endColIndex: startIndex + test.rawTag.length,
+					},
+				})
+				startIndex = line.indexOf(test.rawTag, startIndex + 1)
+			}
+			return acc
+		}, [] as AnnotationTag[])
+		// Perform test
+		expect(parseAnnotationTags({ codeLines })).toEqual(expected)
+	}
 
 	function getTags(code: string) {
-		const codeLines = code.trim().split(/\r?\n/)
+		const codeLines = splitCodeLines(code)
 		return parseAnnotationTags({ codeLines })
+	}
+
+	function splitCodeLines(code: string) {
+		return code.trim().split(/\r?\n/)
 	}
 })
