@@ -1,6 +1,7 @@
 import type { AnnotationTag } from 'annotation-comments'
 import { describe, expect, test } from 'vitest'
 import { parseAnnotationTags } from '../src/internal/tag-parser'
+import { parseAsGlobalRegExp } from '../src/internal/regexps'
 
 describe('parseAnnotationTags', () => {
 	test('Returns an empty array when no annotation tags are found', () => {
@@ -150,6 +151,15 @@ console.log('Some code');
 					relativeTargetRange: undefined,
 				})
 			})
+
+			test(`[!tag:"C:\\Users\\Test Path"]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `C:\\Users\\Test Path`,
+					relativeTargetRange: undefined,
+				})
+			})
 		})
 
 		describe('Tags with quoted target search query and target range', () => {
@@ -168,6 +178,64 @@ console.log('Some code');
 					name: 'tag',
 					targetSearchQuery: `single-quoted term`,
 					relativeTargetRange: -5,
+				})
+			})
+		})
+
+		describe('Tags with RegExp target search query', () => {
+			test(`[!tag:/reg(exp)|regular (expression)/]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: parseAsGlobalRegExp(/reg(exp)|regular (expression)/),
+					relativeTargetRange: undefined,
+				})
+			})
+
+			test(`[!tag:/with escaped \\\\ backslash and \\/ slash/]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: parseAsGlobalRegExp(/with escaped \\ backslash and \/ slash/),
+					relativeTargetRange: undefined,
+				})
+			})
+
+			test(`[!tag:/regexp[s]?|"regular\\s+\\w{2}pressions?"/]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: parseAsGlobalRegExp(/regexp[s]?|"regular\s+\w{2}pressions?"/),
+					relativeTargetRange: undefined,
+				})
+			})
+		})
+
+		describe('Tags with RegExp target search query and target range', () => {
+			test(`[!tag:/reg(exp)|regular (expression)/:5]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: parseAsGlobalRegExp(/reg(exp)|regular (expression)/),
+					relativeTargetRange: 5,
+				})
+			})
+
+			test(`[!tag:/with escaped \\\\ backslash and \\/ slash/:-3]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: parseAsGlobalRegExp(/with escaped \\ backslash and \/ slash/),
+					relativeTargetRange: -3,
+				})
+			})
+
+			test(`[!tag:/regexp[s]?|"regular\\s+\\w{2}pressions?"/:1]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: parseAsGlobalRegExp(/regexp[s]?|"regular\s+\w{2}pressions?"/),
+					relativeTargetRange: 1,
 				})
 			})
 		})

@@ -18,13 +18,12 @@ export type AnnotationTag = {
 	 * located inside the annotation tag.
 	 *
 	 * This query can be used to search for the target of the annotation.
-	 * It can be a plaintext term, optionally within single or double quotes,
-	 * or a regular expression within forward slashes `/`.
+	 * It can be a string or a regular expression.
 	 *
 	 * Example: The tag `[!ins:Astro.props]` targets the next occurrence
 	 * of the plaintext search term `Astro.props`.
 	 */
-	targetSearchQuery?: string | undefined
+	targetSearchQuery?: string | RegExp | undefined
 	/**
 	 * The optional relative target range of the annotation,
 	 * located inside the annotation tag.

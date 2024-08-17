@@ -1,5 +1,6 @@
 import { AnnotationTag } from '../core/types'
 import { getEscapeSequenceRegExp } from './escaping'
+import { parseAsGlobalRegExp } from './regexps'
 
 type ParseAnnotationTagsOptions = {
 	codeLines: string[]
@@ -73,20 +74,28 @@ const annotationTagRegex = new RegExp(
 	'g'
 )
 
-const unquotedValueEscapeSequence = getEscapeSequenceRegExp(':', ']')
-const quotedValueEscapeSequences = new Map<string, RegExp>([
-	['"', getEscapeSequenceRegExp('"')],
-	["'", getEscapeSequenceRegExp("'")],
+const plainValueEscapeSequence = getEscapeSequenceRegExp('\\', ':', ']')
+const delimitedValueEscapeSequences = new Map<string, RegExp>([
+	['"', getEscapeSequenceRegExp('\\', '"')],
+	["'", getEscapeSequenceRegExp('\\', "'")],
 	['/', getEscapeSequenceRegExp('/')],
 ])
 
-function parseTargetSearchQuery(rawTargetSearchQuery: string | undefined): string | undefined {
+function parseTargetSearchQuery(rawTargetSearchQuery: string | undefined): string | RegExp | undefined {
 	if (rawTargetSearchQuery === undefined || rawTargetSearchQuery === '') return
-	const quotedValueEscapeSequence = quotedValueEscapeSequences.get(rawTargetSearchQuery[0])
-	const escapeSequenceRegExp = quotedValueEscapeSequence || unquotedValueEscapeSequence
-	const unescapedQuery = rawTargetSearchQuery.replace(escapeSequenceRegExp, '$1')
-	const queryWithoutQuotes = quotedValueEscapeSequence === undefined ? unescapedQuery : unescapedQuery.slice(1, -1)
-	return queryWithoutQuotes
+	const delimiter = rawTargetSearchQuery[0]
+	const delimitedValueEscapeSequence = delimitedValueEscapeSequences.get(delimiter)
+	const escapeSequenceRegExp = delimitedValueEscapeSequence || plainValueEscapeSequence
+	const undelimitedQuery = delimitedValueEscapeSequence === undefined ? rawTargetSearchQuery : rawTargetSearchQuery.slice(1, -1)
+	const unescapedQuery = undelimitedQuery.replace(escapeSequenceRegExp, '$1')
+
+	// If the delimiter was a slash, try to parse the value as a regular expression and return it
+	if (delimiter === '/') {
+		return parseAsGlobalRegExp(unescapedQuery)
+	}
+
+	// Otherwise, return the unescaped query as a string
+	return unescapedQuery
 }
 
 export function parseAnnotationTags(options: ParseAnnotationTagsOptions): AnnotationTag[] {

@@ -12,5 +12,5 @@ export function escapeRegExp(input: string) {
  * to be escaped in the first place.
  */
 export function getEscapeSequenceRegExp(...valueEndDelimiters: string[]): RegExp {
-	return new RegExp(`\\\\(${['\\', ...valueEndDelimiters].map(escapeRegExp).join('|')})`, 'g')
+	return new RegExp(`\\\\(${valueEndDelimiters.map(escapeRegExp).join('|')})`, 'g')
 }
