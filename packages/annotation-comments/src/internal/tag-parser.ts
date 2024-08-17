@@ -1,4 +1,5 @@
 import { AnnotationTag } from '../core/types'
+import { getEscapeSequenceRegExp } from './escaping'
 
 type ParseAnnotationTagsOptions = {
 	codeLines: string[]
@@ -72,6 +73,22 @@ const annotationTagRegex = new RegExp(
 	'g'
 )
 
+const unquotedValueEscapeSequence = getEscapeSequenceRegExp(':', ']')
+const quotedValueEscapeSequences = new Map<string, RegExp>([
+	['"', getEscapeSequenceRegExp('"')],
+	["'", getEscapeSequenceRegExp("'")],
+	['/', getEscapeSequenceRegExp('/')],
+])
+
+function parseTargetSearchQuery(rawTargetSearchQuery: string | undefined): string | undefined {
+	if (rawTargetSearchQuery === undefined || rawTargetSearchQuery === '') return
+	const quotedValueEscapeSequence = quotedValueEscapeSequences.get(rawTargetSearchQuery[0])
+	const escapeSequenceRegExp = quotedValueEscapeSequence || unquotedValueEscapeSequence
+	const unescapedQuery = rawTargetSearchQuery.replace(escapeSequenceRegExp, '$1')
+	const queryWithoutQuotes = quotedValueEscapeSequence === undefined ? unescapedQuery : unescapedQuery.slice(1, -1)
+	return queryWithoutQuotes
+}
+
 export function parseAnnotationTags(options: ParseAnnotationTagsOptions): AnnotationTag[] {
 	const { codeLines } = options
 	const annotationTags: AnnotationTag[] = []
@@ -79,10 +96,11 @@ export function parseAnnotationTags(options: ParseAnnotationTagsOptions): Annota
 	codeLines.forEach((line, lineIndex) => {
 		const matches = [...line.matchAll(annotationTagRegex)]
 		matches.forEach((match) => {
-			const [, name, targetSearchQuery, relativeTargetRange] = match
+			const [, name, rawTargetSearchQuery, relativeTargetRange] = match
 			const rawTag = match[0]
 			const startColIndex = match.index
 			const endColIndex = startColIndex + rawTag.length
+			const targetSearchQuery = parseTargetSearchQuery(rawTargetSearchQuery)
 			annotationTags.push({
 				name,
 				targetSearchQuery,

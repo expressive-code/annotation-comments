@@ -16,7 +16,7 @@ console.log('Some code');
 		).toEqual([])
 	})
 
-	describe('Name only', () => {
+	describe('Parses tag names', () => {
 		test(`[!tag]`, ({ task }) => {
 			performTagTest({
 				rawTag: task.name,
@@ -25,9 +25,17 @@ console.log('Some code');
 				relativeTargetRange: undefined,
 			})
 		})
+		test(`[!code tag] (for Shiki transformer compatibility)`, ({ task }) => {
+			performTagTest({
+				rawTag: task.name.replace(/ \(.*?\)/, ''),
+				name: 'tag',
+				targetSearchQuery: undefined,
+				relativeTargetRange: undefined,
+			})
+		})
 	})
 
-	describe('With relative target range', () => {
+	describe('Parses relative target ranges', () => {
 		test(`[!positive-range:3]`, ({ task }) => {
 			performTagTest({
 				rawTag: task.name,
@@ -47,118 +55,120 @@ console.log('Some code');
 		})
 	})
 
-	describe('With unquoted target search query', () => {
-		test(`[!tag:search-term]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: 'search-term',
-				relativeTargetRange: undefined,
+	describe('Parses target search queries', () => {
+		describe('Tags with unquoted target search query', () => {
+			test(`[!tag:search-term]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: 'search-term',
+					relativeTargetRange: undefined,
+				})
+			})
+
+			test(`[!tag:term with spaces and chars like .,;?!"'/-]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `term with spaces and chars like .,;?!"'/-`,
+					relativeTargetRange: undefined,
+				})
 			})
 		})
 
-		test(`[!tag:term with spaces and chars like .,;?!"'/-]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `term with spaces and chars like .,;?!"'/-`,
-				relativeTargetRange: undefined,
+		describe('Tags with unquoted target search query and target range', () => {
+			test(`[!tag:search-term:5]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: 'search-term',
+					relativeTargetRange: 5,
+				})
 			})
-		})
-	})
 
-	describe('With unquoted target search query and target range', () => {
-		test(`[!tag:search-term:5]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: 'search-term',
-				relativeTargetRange: 5,
-			})
-		})
-
-		test(`[!tag:term with spaces and chars like .;/"'?!-, too:-2]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `term with spaces and chars like .;/"'?!-, too`,
-				relativeTargetRange: -2,
-			})
-		})
-	})
-
-	describe('With quoted target search query', () => {
-		test(`[!tag:"double-quoted term"]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `"double-quoted term"`,
-				relativeTargetRange: undefined,
+			test(`[!tag:term with spaces and chars like .;/"'?!-, too:-2]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `term with spaces and chars like .;/"'?!-, too`,
+					relativeTargetRange: -2,
+				})
 			})
 		})
 
-		test(`[!tag:'single-quoted term']`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `'single-quoted term'`,
-				relativeTargetRange: undefined,
+		describe('Tags with quoted target search query', () => {
+			test(`[!tag:"double-quoted term"]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `double-quoted term`,
+					relativeTargetRange: undefined,
+				})
+			})
+
+			test(`[!tag:'single-quoted term']`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `single-quoted term`,
+					relativeTargetRange: undefined,
+				})
+			})
+
+			test(`[!tag:"double-quoted term with 'single quotes' inside"]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `double-quoted term with 'single quotes' inside`,
+					relativeTargetRange: undefined,
+				})
+			})
+
+			test(`[!tag:'single-quoted term with "double quotes" inside']`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `single-quoted term with "double quotes" inside`,
+					relativeTargetRange: undefined,
+				})
+			})
+
+			test(`[!tag:"escaped \\"same style quotes\\" inside"]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `escaped "same style quotes" inside`,
+					relativeTargetRange: undefined,
+				})
+			})
+
+			test(`[!tag:"wild / ' mix / of:3] chars"]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `wild / ' mix / of:3] chars`,
+					relativeTargetRange: undefined,
+				})
 			})
 		})
 
-		test(`[!tag:"double-quoted term with 'single quotes' inside"]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `"double-quoted term with 'single quotes' inside"`,
-				relativeTargetRange: undefined,
+		describe('Tags with quoted target search query and target range', () => {
+			test(`[!tag:"double-quoted term":10]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `double-quoted term`,
+					relativeTargetRange: 10,
+				})
 			})
-		})
 
-		test(`[!tag:'single-quoted term with "double quotes" inside']`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `'single-quoted term with "double quotes" inside'`,
-				relativeTargetRange: undefined,
-			})
-		})
-
-		test(`[!tag:"escaped \\"same style quotes\\" inside"]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `"escaped \\"same style quotes\\" inside"`,
-				relativeTargetRange: undefined,
-			})
-		})
-
-		test(`[!tag:"wild / ' mix / of:3] chars"]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `"wild / ' mix / of:3] chars"`,
-				relativeTargetRange: undefined,
-			})
-		})
-	})
-
-	describe('With quoted target search query and target range', () => {
-		test(`[!tag:"double-quoted term":10]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `"double-quoted term"`,
-				relativeTargetRange: 10,
-			})
-		})
-
-		test(`[!tag:'single-quoted term':-5]`, ({ task }) => {
-			performTagTest({
-				rawTag: task.name,
-				name: 'tag',
-				targetSearchQuery: `'single-quoted term'`,
-				relativeTargetRange: -5,
+			test(`[!tag:'single-quoted term':-5]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `single-quoted term`,
+					relativeTargetRange: -5,
+				})
 			})
 		})
 	})
