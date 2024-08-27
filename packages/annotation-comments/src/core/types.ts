@@ -1,9 +1,9 @@
 export type AnnotationComment = {
 	tag: AnnotationTag
 	contents: string[]
-	commentRange: CodeRange
-	contentRanges: CodeRange[]
-	targetRanges: CodeRange[]
+	commentRange: SourceRange
+	contentRanges: SourceRange[]
+	targetRanges: SourceRange[]
 }
 
 export type AnnotationTag = {
@@ -42,24 +42,25 @@ export type AnnotationTag = {
 	relativeTargetRange?: number | undefined
 	rawTag: string
 	/**
-	 * The tag's location within the parsed code.
+	 * The tag's range within the parsed source code.
 	 */
-	location: CodeRange
+	range: SourceRange
 }
 
-export type CodeRange = {
-	/** Zero-based index of the range's starting line. */
-	startLineIndex: number
-	/** Zero-based index of the range's ending line. */
-	endLineIndex: number
+export type SourceLocation = {
+	/** Zero-based line index. */
+	line: number
 	/**
-	 * Zero-based index of the range's starting column.
-	 * If not provided, the range covers the full starting line.
+	 * Zero-based column index inside the line.
+	 *
+	 * If not provided, the location references the full line.
 	 */
-	startColIndex?: number | undefined
-	/**
-	 * Zero-based index of the range's ending column.
-	 * If not provided, the range covers the full ending line.
-	 */
-	endColIndex?: number | undefined
+	column?: number | undefined
+}
+
+export type SourceRange = {
+	/** The beginning (line & optional column) of the range. */
+	start: SourceLocation
+	/** The end (line & optional column) of the range. */
+	end: SourceLocation
 }

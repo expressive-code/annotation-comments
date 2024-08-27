@@ -1,7 +1,8 @@
-import type { AnnotationTag } from 'annotation-comments'
 import { describe, expect, test } from 'vitest'
-import { parseAnnotationTags } from '../src/internal/tag-parser'
-import { parseAsGlobalRegExp } from '../src/internal/regexps'
+import type { AnnotationTag } from '../src/core/types'
+import { parseAnnotationTags } from '../src/parsers/annotation-tags'
+import { createGlobalRegExp } from '../src/internal/regexps'
+import { splitCodeLines } from './utils'
 
 describe('parseAnnotationTags', () => {
 	test('Returns an empty array when no annotation tags are found', () => {
@@ -187,7 +188,7 @@ console.log('Some code');
 				performTagTest({
 					rawTag: task.name,
 					name: 'tag',
-					targetSearchQuery: parseAsGlobalRegExp(/reg(exp)|regular (expression)/),
+					targetSearchQuery: createGlobalRegExp(/reg(exp)|regular (expression)/),
 					relativeTargetRange: undefined,
 				})
 			})
@@ -196,7 +197,7 @@ console.log('Some code');
 				performTagTest({
 					rawTag: task.name,
 					name: 'tag',
-					targetSearchQuery: parseAsGlobalRegExp(/with escaped \\ backslash and \/ slash/),
+					targetSearchQuery: createGlobalRegExp(/with escaped \\ backslash and \/ slash/),
 					relativeTargetRange: undefined,
 				})
 			})
@@ -205,7 +206,7 @@ console.log('Some code');
 				performTagTest({
 					rawTag: task.name,
 					name: 'tag',
-					targetSearchQuery: parseAsGlobalRegExp(/regexp[s]?|"regular\s+\w{2}pressions?"/),
+					targetSearchQuery: createGlobalRegExp(/regexp[s]?|"regular\s+\w{2}pressions?"/),
 					relativeTargetRange: undefined,
 				})
 			})
@@ -216,7 +217,7 @@ console.log('Some code');
 				performTagTest({
 					rawTag: task.name,
 					name: 'tag',
-					targetSearchQuery: parseAsGlobalRegExp(/reg(exp)|regular (expression)/),
+					targetSearchQuery: createGlobalRegExp(/reg(exp)|regular (expression)/),
 					relativeTargetRange: 5,
 				})
 			})
@@ -225,7 +226,7 @@ console.log('Some code');
 				performTagTest({
 					rawTag: task.name,
 					name: 'tag',
-					targetSearchQuery: parseAsGlobalRegExp(/with escaped \\ backslash and \/ slash/),
+					targetSearchQuery: createGlobalRegExp(/with escaped \\ backslash and \/ slash/),
 					relativeTargetRange: -3,
 				})
 			})
@@ -234,14 +235,14 @@ console.log('Some code');
 				performTagTest({
 					rawTag: task.name,
 					name: 'tag',
-					targetSearchQuery: parseAsGlobalRegExp(/regexp[s]?|"regular\s+\w{2}pressions?"/),
+					targetSearchQuery: createGlobalRegExp(/regexp[s]?|"regular\s+\w{2}pressions?"/),
 					relativeTargetRange: 1,
 				})
 			})
 		})
 	})
 
-	function performTagTest(test: Required<Omit<AnnotationTag, 'location'>>) {
+	function performTagTest(test: Required<Omit<AnnotationTag, 'range'>>) {
 		const codeLines = splitCodeLines(`
 // ${test.rawTag} Tag in a single-line comment
 console.log('Some code'); // ${test.rawTag} Tag at the end of a line
@@ -258,11 +259,9 @@ ${test.rawTag} Tag in a multi-line comment
 					rawTag: test.rawTag,
 					relativeTargetRange: test.relativeTargetRange,
 					targetSearchQuery: test.targetSearchQuery,
-					location: {
-						startLineIndex: lineIndex,
-						endLineIndex: lineIndex,
-						startColIndex: startIndex,
-						endColIndex: startIndex + test.rawTag.length,
+					range: {
+						start: { line: lineIndex, column: startIndex },
+						end: { line: lineIndex, column: startIndex + test.rawTag.length },
 					},
 				})
 				startIndex = line.indexOf(test.rawTag, startIndex + 1)
@@ -276,9 +275,5 @@ ${test.rawTag} Tag in a multi-line comment
 	function getTags(code: string) {
 		const codeLines = splitCodeLines(code)
 		return parseAnnotationTags({ codeLines })
-	}
-
-	function splitCodeLines(code: string) {
-		return code.trim().split(/\r?\n/)
 	}
 })

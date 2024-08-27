@@ -7,7 +7,7 @@ import { coerceError } from './errors'
  * If supported by the platform this code is running on, it will also set the `d` flag that
  * enables capture group indices.
  */
-export function parseAsGlobalRegExp(pattern: string | RegExp, extraFlags?: string): RegExp {
+export function createGlobalRegExp(pattern: string | RegExp, extraFlags?: string): RegExp {
 	let regExp: RegExp | undefined
 	try {
 		// Try to use regular expressions with capture group indices

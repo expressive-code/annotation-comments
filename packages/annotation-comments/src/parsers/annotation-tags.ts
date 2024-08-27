@@ -1,8 +1,8 @@
 import { AnnotationTag } from '../core/types'
-import { getEscapeSequenceRegExp } from './escaping'
-import { parseAsGlobalRegExp } from './regexps'
+import { getEscapeSequenceRegExp } from '../internal/escaping'
+import { createGlobalRegExp } from '../internal/regexps'
 
-type ParseAnnotationTagsOptions = {
+export type ParseAnnotationTagsOptions = {
 	codeLines: string[]
 }
 
@@ -91,7 +91,7 @@ function parseTargetSearchQuery(rawTargetSearchQuery: string | undefined): strin
 
 	// If the delimiter was a slash, try to parse the value as a regular expression and return it
 	if (delimiter === '/') {
-		return parseAsGlobalRegExp(unescapedQuery)
+		return createGlobalRegExp(unescapedQuery)
 	}
 
 	// Otherwise, return the unescaped query as a string
@@ -115,11 +115,9 @@ export function parseAnnotationTags(options: ParseAnnotationTagsOptions): Annota
 				targetSearchQuery,
 				relativeTargetRange: relativeTargetRange !== undefined ? Number(relativeTargetRange) : undefined,
 				rawTag,
-				location: {
-					startLineIndex: lineIndex,
-					endLineIndex: lineIndex,
-					startColIndex,
-					endColIndex,
+				range: {
+					start: { line: lineIndex, column: startColIndex },
+					end: { line: lineIndex, column: endColIndex },
 				},
 			})
 		})
