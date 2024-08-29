@@ -1,20 +1,31 @@
 import { describe, expect, test } from 'vitest'
-import type { AnnotationTag, AnnotationComment } from '../src/core/types'
+import type { AnnotationComment } from '../src/core/types'
 import { parseAnnotationTags } from '../src/parsers/annotation-tags'
 import { parseParentComment } from '../src/parsers/parent-comment'
 import { splitCodeLines } from './utils'
 
-describe('parseParentComment', () => {
-	test('Returns undefined when no parent comment is found', () => {
-		expect(
-			getParentComment(`
-// This comment is not on the same line as the tag
-console.log('Some code containing [!ins] outside of a comment');
-			`)
-		).toEqual(undefined)
+describe('parseParentComment()', () => {
+	describe('Returns undefined when no valid parent comment is found', () => {
+		describe('Single-line comment syntax', () => {
+			test('No comment syntax in the same line', () => {
+				expect(getParentComment(`console.log('This is [!ins] in a string')`)).toEqual(undefined)
+			})
+			test('Comment syntax located after the annotation tag', () => {
+				expect(getParentComment(`console.log('More [!test] text') // Hi!`)).toEqual(undefined)
+			})
+			test('Missing whitespace before comment opening syntax', () => {
+				expect(getParentComment(`someCode()// [!note] Invalid syntax`)).toEqual(undefined)
+			})
+			test('Missing whitespace before annotation tag', () => {
+				expect(getParentComment(`someCode() //[!note] Invalid syntax`)).toEqual(undefined)
+			})
+			test('Content between comment opening and annotation tag', () => {
+				expect(getParentComment(`someCode() // Hi [!note] This won't work`)).toEqual(undefined)
+			})
+		})
 	})
 
-	describe('Single-line comments', () => {
+	describe('Supports single-line comments', () => {
 		describe('Starting at the beginning of the line', () => {
 			const syntaxes = [
 				// Starting at column 0, followed by a space
@@ -144,6 +155,94 @@ console.log('Some code containing [!ins] outside of a comment');
 				expect(comment.contents).toEqual(['Mismatching comment # [!syntax] also prevents chaining'])
 				expect(comment.commentRange).toEqual({ start: { line: 2, column: commentLine.indexOf(' //') }, end: { line: 2 } })
 				expect(comment.contentRanges).toEqual([{ start: { line: 2, column: commentLine.indexOf('Mismatching') }, end: { line: 2 } }])
+			})
+		})
+		describe(`Allows multi-line content by repeating the same opening syntax`, () => {
+			test('Single annotation comment with multi-line content', () => {
+				const lines = [
+					// Starts like a regular single-line annotation comment...
+					'// [!note] Annotation content',
+					// ...but continues on the next lines by repeating the comment opening syntax
+					'// that spans multiple lines',
+					'// until the comment ends',
+					// ...and ends when the comment syntax is not repeated
+					'someCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
+				expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 4 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 2, column: lines[0].indexOf('Annotation') }, end: { line: 2 } },
+					{ start: { line: 3, column: lines[1].indexOf('that') }, end: { line: 3 } },
+					{ start: { line: 4, column: lines[2].indexOf('until') }, end: { line: 4 } },
+				])
+			})
+			test('Multi-line content ends when encountering a different comment syntax', () => {
+				const lines = [
+					// Starts like a regular single-line annotation comment...
+					'// [!note] Annotation content',
+					// ...but continues on the next line by repeating the comment opening syntax
+					'// that spans multiple lines',
+					// ...and ends when encountering a different comment syntax
+					'# This is a regular comment and not part of the annotation',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines'])
+				expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 3 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 2, column: lines[0].indexOf('Annotation') }, end: { line: 2 } },
+					{ start: { line: 3, column: lines[1].indexOf('that') }, end: { line: 3 } },
+				])
+			})
+			test('Multi-line content ends when encountering another annotation comment', () => {
+				const lines = [
+					// Starts like a regular single-line annotation comment...
+					'// [!note] Annotation 1 content',
+					// ...but continues on the next line by repeating the comment opening syntax
+					'// that spans multiple lines',
+					// ...and ends when encountering another annotation comment
+					'// [!test] Annotation 2 content',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation 1 content', 'that spans multiple lines'])
+				expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 3 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 2, column: lines[0].indexOf('Annotation') }, end: { line: 2 } },
+					{ start: { line: 3, column: lines[1].indexOf('that') }, end: { line: 3 } },
+				])
+			})
+			test('Multi-line content ends when encountering "---" on its own line', () => {
+				const lines = [
+					// Starts like a regular single-line annotation comment...
+					'// [!note] Annotation content',
+					// ...but continues on the next line by repeating the comment opening syntax
+					'// that spans multiple lines',
+					// ...and ends when encountering "---" on its own line
+					'// ---',
+					'// This is a regular comment and not part of the annotation',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines'])
+				// Expect the "---" line to be included in the comment range
+				// so it will be removed when the comment is removed
+				expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 4 } })
+				// However, it must not be included in the content ranges
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 2, column: lines[0].indexOf('Annotation') }, end: { line: 2 } },
+					{ start: { line: 3, column: lines[1].indexOf('that') }, end: { line: 3 } },
+				])
+			})
+			test('Comments starting after code on the same line cannot be multi-line', () => {
+				const lines = [
+					// A regular single-line comment that starts after some code
+					'someCode() // [!note] Annotation content',
+					// ...cannot be continued on the next line
+					'// This is a regular comment and not part of the annotation',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content'])
+				expect(comment.commentRange).toEqual({ start: { line: 2, column: lines[0].indexOf(' // [!') }, end: { line: 2 } })
+				expect(comment.contentRanges).toEqual([{ start: { line: 2, column: lines[0].indexOf('Annotation') }, end: { line: 2 } }])
 			})
 		})
 	})

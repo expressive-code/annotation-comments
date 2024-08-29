@@ -4,7 +4,7 @@ import { parseAnnotationTags } from '../src/parsers/annotation-tags'
 import { createGlobalRegExp } from '../src/internal/regexps'
 import { splitCodeLines } from './utils'
 
-describe('parseAnnotationTags', () => {
+describe('parseAnnotationTags()', () => {
 	test('Returns an empty array when no annotation tags are found', () => {
 		expect(
 			getTags(`

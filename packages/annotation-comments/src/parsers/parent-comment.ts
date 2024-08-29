@@ -98,7 +98,11 @@ export function parseParentComment(options: ParseParentCommentOptions): Annotati
 				const lineContent = getNonWhitespaceContentInLine({ codeLines, lineIndex, startColumn: possibleContentStart })
 				if (lineContent) {
 					// Stop if the line has `---` as its only text content
-					if (lineContent.content === '---') break
+					if (lineContent.content === '---') {
+						// Make the line part of the comment, but don't add its content
+						comment.commentRange.end = { line: lineIndex }
+						break
+					}
 					// Stop if the line starts with an annotation tag opening sequence `[!`
 					if (lineContent.content.startsWith('[!')) break
 					// Otherwise, add the content and expand the comment range
