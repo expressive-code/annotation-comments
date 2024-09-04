@@ -26,7 +26,7 @@ describe('parseParentComment()', () => {
 	})
 
 	describe('Supports single-line comments', () => {
-		describe('Starting at the beginning of the line', () => {
+		describe('At the beginning of the line', () => {
 			const syntaxes = [
 				// Starting at column 0, followed by a space
 				'// ',
@@ -47,8 +47,7 @@ describe('parseParentComment()', () => {
 			]
 			describe('Without content', () => {
 				test.each(syntaxes)('"%s[!ins]"', (syntax) => {
-					syntax = syntax.replaceAll('<tab>', '\t')
-					const commentLine = `${syntax}[!ins]`
+					const commentLine = `${cs(syntax)}[!ins]`
 					const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
 					expect(comment.contents).toEqual([])
 					expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 2 } })
@@ -57,8 +56,7 @@ describe('parseParentComment()', () => {
 			})
 			describe('With content', () => {
 				test.each(syntaxes)('"%s[!note] Annotation content"', (syntax) => {
-					syntax = syntax.replaceAll('<tab>', '\t')
-					const commentLine = `${syntax}[!note] Annotation content`
+					const commentLine = `${cs(syntax)}[!note] Annotation content`
 					const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
 					expect(comment.contents).toEqual(['Annotation content'])
 					expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 2 } })
@@ -66,7 +64,7 @@ describe('parseParentComment()', () => {
 				})
 			})
 		})
-		describe('Starting after some code', () => {
+		describe('After code', () => {
 			const cases = [
 				// Separated from the code by a space
 				' // ',
@@ -83,7 +81,7 @@ describe('parseParentComment()', () => {
 			]
 			describe('Without content', () => {
 				test.each(cases)(`"someCode()%s[!del]"`, (syntax) => {
-					syntax = syntax.replaceAll('<tab>', '\t')
+					syntax = cs(syntax)
 					const commentLine = `someCode()${syntax}[!del]`
 					const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
 					expect(comment.contents).toEqual([])
@@ -93,7 +91,7 @@ describe('parseParentComment()', () => {
 			})
 			describe('With content', () => {
 				test.each(cases)(`"someCode()%s[!note] Let's run it!"`, (syntax) => {
-					syntax = syntax.replaceAll('<tab>', '\t')
+					syntax = cs(syntax)
 					const commentLine = `someCode()${syntax}[!note] Let's run it!`
 					const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
 					expect(comment.contents).toEqual([`Let's run it!`])
@@ -246,6 +244,261 @@ describe('parseParentComment()', () => {
 			})
 		})
 	})
+
+	describe('Supports multi-line comments', () => {
+		describe('Starting and ending at the same line', () => {
+			describe('Without any code on the line', () => {
+				const syntaxes = [
+					// Starting at column 0, separated from inner content by spaces
+					['/* ', ' */'],
+					['<!-- ', ' -->'],
+					['{ /* ', ' */ }'],
+					// Starting at column 0, separated from inner content by a tab
+					['/*<tab>', '<tab>*/'],
+					['<!--<tab>', '<tab>-->'],
+					['{ /*<tab>', '<tab>*/ }'],
+					// Starting at column 2, indented by spaces
+					['  /* ', ' */'],
+					['  (* ', ' *)'],
+					['  --[[ ', ' ]]'],
+					// Starting at column 1, indented by a tab
+					['<tab>/* ', ' */'],
+					['<tab>(* ', ' *)'],
+					['<tab>--[[ ', ' ]]'],
+				]
+				describe('Without content', () => {
+					test.each(syntaxes)('"%s[!ins]%s"', (opening, closing) => {
+						const commentLine = `${cs(opening)}[!ins]${cs(closing)}`
+						const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
+						expect(comment.contents).toEqual([])
+						expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 2 } })
+						expect(comment.contentRanges).toEqual([])
+					})
+				})
+				describe('With content', () => {
+					test.each(syntaxes)('"%s[!note] Annotation content%s"', (opening, closing) => {
+						const commentLine = `${cs(opening)}[!note] Annotation content${cs(closing)}`
+						const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
+						expect(comment.contents).toEqual(['Annotation content'])
+						expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 2 } })
+						expect(comment.contentRanges).toEqual([{ start: { line: 2, column: commentLine.indexOf('Annotation') }, end: { line: 2, column: commentLine.indexOf('content') + 7 } }])
+					})
+				})
+			})
+			describe('Before code', () => {
+				const syntaxes = [
+					// Separated from the code by a space
+					['/* ', ' */ '],
+					['<!-- ', ' --> '],
+					['{ /* ', ' */ } '],
+					// Separated from the code by 2 spaces
+					['/* ', ' */  '],
+					['(* ', ' *)  '],
+					['--[[ ', ' ]]  '],
+					// Separated from the code by a tab
+					['/* ', ' */<tab>'],
+					['(* ', ' *)<tab>'],
+					['--[[ ', ' ]]<tab>'],
+				]
+				describe('Without content', () => {
+					test.each(syntaxes)('"%s[!ins]%ssomeCode()"', (opening, closing) => {
+						const commentLine = `${cs(opening)}[!ins]${cs(closing)}someCode()`
+						const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
+						expect(comment.contents).toEqual([])
+						// Expect all mandatory whitespace between the comment and the code
+						// to be included in the comment range
+						expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 2, column: commentLine.indexOf('someCode') } })
+						expect(comment.contentRanges).toEqual([])
+					})
+				})
+				describe('With content', () => {
+					test.each(syntaxes)('"%s[!note] Annotation content%ssomeCode()"', (opening, closing) => {
+						const commentLine = `${cs(opening)}[!note] Annotation content${cs(closing)}someCode()`
+						const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
+						expect(comment.contents).toEqual(['Annotation content'])
+						// Expect all mandatory whitespace between the comment and the code
+						// to be included in the comment range
+						expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 2, column: commentLine.indexOf('someCode') } })
+						expect(comment.contentRanges).toEqual([{ start: { line: 2, column: commentLine.indexOf('Annotation') }, end: { line: 2, column: commentLine.indexOf('content') + 7 } }])
+					})
+				})
+				test('Does not capture indentation before the comment', () => {
+					const commentLine = `  /* [!ins] */ someCode()`
+					const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
+					expect(comment.contents).toEqual([])
+					// Expect all mandatory whitespace between the comment and the code
+					// to be included in the comment range, BUT NOT the indentation
+					expect(comment.commentRange).toEqual({ start: { line: 2, column: commentLine.indexOf('/*') }, end: { line: 2, column: commentLine.indexOf('someCode') } })
+					expect(comment.contentRanges).toEqual([])
+				})
+			})
+			describe('After code', () => {
+				const syntaxes = [
+					// Separated from the code by a space
+					[' /* ', ' */'],
+					[' <!-- ', ' -->'],
+					[' { /* ', ' */ }'],
+					// Separated from the code by 2 spaces
+					['  /* ', ' */'],
+					['  (* ', ' *)'],
+					['  --[[ ', ' ]]'],
+					// Separated from the code by a tab
+					['<tab>/* ', ' */'],
+					['<tab>(* ', ' *)'],
+					['<tab>--[[ ', ' ]]'],
+				]
+				describe('Without content', () => {
+					test.each(syntaxes)('"someCode()%s[!ins]%s"', (opening, closing) => {
+						const commentLine = `someCode()${cs(opening)}[!ins]${cs(closing)}`
+						const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
+						expect(comment.contents).toEqual([])
+						// Expect all mandatory whitespace between the code and the comment
+						// to be included in the comment range
+						expect(comment.commentRange).toEqual({ start: { line: 2, column: commentLine.indexOf(cs(opening)) }, end: { line: 2 } })
+						expect(comment.contentRanges).toEqual([])
+					})
+				})
+				describe('With content', () => {
+					test.each(syntaxes)('"someCode()%s[!note] Annotation content%s"', (opening, closing) => {
+						const commentLine = `someCode()${cs(opening)}[!note] Annotation content${cs(closing)}`
+						const comment = getParentComment(getTestCode(commentLine)) as AnnotationComment
+						expect(comment.contents).toEqual(['Annotation content'])
+						// Expect all mandatory whitespace between the code and the comment
+						// to be included in the comment range
+						expect(comment.commentRange).toEqual({ start: { line: 2, column: commentLine.indexOf(cs(opening)) }, end: { line: 2 } })
+						expect(comment.contentRanges).toEqual([{ start: { line: 2, column: commentLine.indexOf('Annotation') }, end: { line: 2, column: commentLine.indexOf('content') + 7 } }])
+					})
+				})
+			})
+		})
+		describe('Starting and ending at different lines', () => {
+			test('Without newlines around inner comment range', () => {
+				const lines = [
+					// Tag and content start on the opening line
+					'/* [!note] Annotation content',
+					'that spans multiple lines',
+					// Content ends on the closing line
+					'until the comment ends */',
+					'someCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
+				expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 4 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 2, column: lines[0].indexOf('Annotation') }, end: { line: 2 } },
+					{ start: { line: 3 }, end: { line: 3 } },
+					{ start: { line: 4 }, end: { line: 4, column: lines[2].indexOf(' */') } },
+				])
+			})
+			test('With newlines, tag and content not indented', () => {
+				const lines = [
+					'/*',
+					// No indentation
+					'[!note] Annotation content',
+					'that spans multiple lines',
+					'until the comment ends',
+					'*/',
+					'someCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
+				expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 6 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 3, column: lines[1].indexOf('Annotation') }, end: { line: 3 } },
+					{ start: { line: 4 }, end: { line: 4 } },
+					{ start: { line: 5 }, end: { line: 5 } },
+				])
+			})
+			test('With newlines, tag and content indented by two spaces', () => {
+				const lines = [
+					'/*',
+					// Indented tag and content
+					'  [!note] Annotation content',
+					'  that spans multiple lines',
+					'  until the comment ends',
+					'*/',
+					'someCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
+				expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 6 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 3, column: lines[1].indexOf('Annotation') }, end: { line: 3 } },
+					{ start: { line: 4, column: 2 }, end: { line: 4 } },
+					{ start: { line: 5, column: 2 }, end: { line: 5 } },
+				])
+			})
+			test('With newlines, tag and content indented by a tab', () => {
+				const lines = [
+					'/*',
+					// Indented tag and content
+					'\t[!note] Annotation content',
+					'\tthat spans multiple lines',
+					'\tuntil the comment ends',
+					'*/',
+					'someCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
+				expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 6 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 3, column: lines[1].indexOf('Annotation') }, end: { line: 3 } },
+					{ start: { line: 4, column: 1 }, end: { line: 4 } },
+					{ start: { line: 5, column: 1 }, end: { line: 5 } },
+				])
+			})
+		})
+		describe('JSDoc-style comments', () => {
+			test('Covers an entire JSDoc comment if the annotation is its only content', () => {
+				const lines = [
+					// JSDoc example with the entire block being indented by a tab
+					'\t/**',
+					// '\t * Some JSDoc that is not part of the annotation comment.',
+					'\t * [!note] Annotation content',
+					'\t * that spans multiple lines',
+					'\t * until the comment ends',
+					'\t */',
+					'\tsomeCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
+				expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 6 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 3, column: lines[1].indexOf('Annotation') }, end: { line: 3 } },
+					{ start: { line: 4, column: 4 }, end: { line: 4 } },
+					{ start: { line: 5, column: 4 }, end: { line: 5 } },
+				])
+			})
+			test.todo('Only covers the annotation lines if the JSDoc contains other content', () => {
+				const lines = [
+					'\t/**',
+					// Non-annotation content
+					'\t * Some JSDoc that is not part of the annotation comment.',
+					// Annotation content
+					'\t * [!note] Annotation content',
+					'\t * that spans multiple lines',
+					'\t * until the comment ends',
+					'\t */',
+					'\tsomeCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
+				expect(comment.commentRange).toEqual({ start: { line: 4 }, end: { line: 6 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 3, column: lines[1].indexOf('Annotation') }, end: { line: 3 } },
+					{ start: { line: 4, column: 4 }, end: { line: 4 } },
+					{ start: { line: 5, column: 4 }, end: { line: 5 } },
+				])
+			})
+		})
+	})
+
+	/**
+	 * Converts special characters inside a test display name string to their actual values.
+	 */
+	function cs(displaySyntax: string) {
+		return displaySyntax.replaceAll('<tab>', '\t')
+	}
 
 	function getTestCode(commentLine: string) {
 		return `
