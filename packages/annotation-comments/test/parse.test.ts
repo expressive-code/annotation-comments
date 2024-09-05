@@ -8,4 +8,5 @@ describe('parseAnnotationComments()', () => {
 	test('Todo', () => {
 		expect(true).toBe(true)
 	})
+	// TODO: We also need to implement and test the `[!ignore-tags]` logic
 })

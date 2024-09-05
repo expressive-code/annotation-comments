@@ -388,7 +388,7 @@ The function follows these steps to process the code:
 
 - The function goes through the given code line by line, looking for strings that match the annotation comment syntax. If a match is found, it will:
   - Extract the annotation name, optional target search query, and optional relative target range from the annotation tag
-  - Ensure that the current annotation tag has not been ignored by an ´ignore-tags` directive. If it has, it will skip the tag and continue searching
+  - Ensure that the current annotation tag has not been ignored by an `ignore-tags` directive. If it has, it will skip the tag and continue searching
   - If given, call the `validateAnnotationName` handler function to check if the annotation name is valid. If this function returns `false`, skip the tag and continue searching
   - **Handle the current annotation tag if it's inside a single-line comment:** Try to find the beginning sequence of a single-line comment directly before the annotation tag, with no non-whitespace character before and after the beginning sequence. If found, it will:
     - Mark the location of the beginning sequence as beginning of the comment

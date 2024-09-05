@@ -20,7 +20,26 @@ describe('parseParentComment()', () => {
 				expect(getParentComment(`someCode() //[!note] Invalid syntax`)).toEqual(undefined)
 			})
 			test('Content between comment opening and annotation tag', () => {
-				expect(getParentComment(`someCode() // Hi [!note] This won't work`)).toEqual(undefined)
+				expect(getParentComment(`someCode() // Hi [!note] This will not work`)).toEqual(undefined)
+			})
+		})
+		describe('Multi-line comment syntax', () => {
+			test('Content between the opening syntax and the annotation tag', () => {
+				expect(getParentComment(`/* Hi [!note] This will not work */`)).toEqual(undefined)
+				expect(getParentComment(`someCode() /* Hi [!note] This will not work */`)).toEqual(undefined)
+			})
+			test('Content between the beginning of the line and the annotation tag', () => {
+				expect(
+					getParentComment(
+						[
+							'someCode()',
+							'/*',
+							// Content before the annotation tag
+							'Hi [!note] This will not work',
+							'*/',
+						].join('\n')
+					)
+				).toEqual(undefined)
 			})
 		})
 	})

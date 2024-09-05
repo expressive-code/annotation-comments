@@ -176,17 +176,36 @@ function findCommentSyntaxMatches(options: {
 	// Validate all syntax requirements for the given line
 	commentSyntaxMatches.forEach((match, index) => {
 		const syntax = multiLineCommentSyntaxes[index]
+		// If the current syntax has a continuation line start requirement,
+		// validate it on non-opening and non-closing lines
 		if (
-			// Check matches that are still valid and that have a continuation line requirement
 			!match.invalid &&
 			syntax.continuationLineStart &&
 			// Only check the requirement on non-opening and non-closing lines
 			lineIndex !== match.openingRange?.start.line &&
 			lineIndex !== match.closingRange?.start.line &&
-			// If the line doesn't match the continuation syntax, mark the match as invalid
+			// If the line doesn't match the continuation syntax, mark the syntax match as invalid
 			!line.match(syntax.continuationLineStart)
 		) {
 			match.invalid = true
+		}
+		// If we're looking for an opening sequence and we're on the tag line,
+		// validate that there is no content (except whitespace) before the tag
+		if (
+			!match.invalid &&
+			type === 'opening' &&
+			// Only check the tag line (which is the one with `endColumn` defined)
+			endColumn !== undefined
+		) {
+			// Get content between the opening sequence (if found on this line) and the tag
+			const openingEndColumn = match.openingRangeWithWhitespace?.end.line === lineIndex ? match.openingRangeWithWhitespace?.end.column : undefined
+			let contentBeforeTag = line.slice(openingEndColumn, endColumn)
+			// Strip the continuation line start syntax if it's present
+			if (!openingEndColumn && syntax.continuationLineStart) {
+				contentBeforeTag = contentBeforeTag.replace(syntax.continuationLineStart, '')
+			}
+			// If there is non-whitespace content before the tag, mark the syntax match as invalid
+			if (contentBeforeTag.trim()) match.invalid = true
 		}
 	})
 
