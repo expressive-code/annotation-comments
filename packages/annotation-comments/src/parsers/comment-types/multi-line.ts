@@ -232,7 +232,8 @@ function getCommentFromMatchingSyntaxPair(options: {
 		// so build the AnnotationComment object and return it
 		const match = commentSyntaxMatches[bestMatchIndex] as MultiLineCommentSyntaxMatch
 		const syntax = multiLineCommentSyntaxes[bestMatchIndex]
-		const isOnSingleLineBeforeCode = match.openingRange.start.line === match.closingRange.end.line && match.closingRangeWithWhitespace.end.column
+		const isOnSingleLine = match.openingRange.start.line === match.closingRange.end.line
+		const isOnSingleLineBeforeCode = isOnSingleLine && match.closingRangeWithWhitespace.end.column
 		const commentRange: SourceRange = {
 			start: isOnSingleLineBeforeCode ? match.openingRange.start : match.openingRangeWithWhitespace.start,
 			end: match.closingRangeWithWhitespace.end,
@@ -241,13 +242,20 @@ function getCommentFromMatchingSyntaxPair(options: {
 			start: match.openingRangeWithWhitespace.end,
 			end: match.closingRangeWithWhitespace.start,
 		}
+		// If the opening sequence ends at a line boundary, adjust the inner range to exclude it
+		if (!innerRange.start.column && !isOnSingleLine) {
+			innerRange.start = { line: innerRange.start.line + 1 }
+		}
+		// If the closing sequence starts on a line boundary, adjust the inner range to exclude it
+		if (!innerRange.end.column && !isOnSingleLine) {
+			innerRange.end = { line: innerRange.end.line - 1 }
+		}
 		const contents: string[] = []
 		const contentRanges: SourceRange[] = []
 
-		for (let lineIndex = tag.range.end.line; lineIndex <= innerRange.end.line; lineIndex++) {
-			const line = codeLines[lineIndex]
-			const startColumn = lineIndex === tag.range.end.line ? tag.range.end.column : lineIndex === innerRange.start.line ? (innerRange.start.column ?? line.length) : 0
-			const endColumn = lineIndex === innerRange.end.line ? (innerRange.end.column ?? 0) : line.length
+		for (let lineIndex = innerRange.start.line; lineIndex <= innerRange.end.line; lineIndex++) {
+			const startColumn = lineIndex === tag.range.end.line ? tag.range.end.column : lineIndex === innerRange.start.line ? innerRange.start.column : undefined
+			const endColumn = lineIndex === innerRange.end.line ? innerRange.end.column : undefined
 
 			const lineContent = getTextContentInLine({
 				codeLines,
@@ -256,8 +264,33 @@ function getCommentFromMatchingSyntaxPair(options: {
 				endColumn,
 				continuationLineStart: syntax.continuationLineStart,
 			})
-			contents.push(lineContent.content)
-			contentRanges.push(lineContent.contentRange)
+			if (lineIndex < tag.range.end.line) {
+				// If the current comment line has content and is located before the annotation tag,
+				// we need to reduce the comment range to exclude any non-annotation content
+				// including the opening and closing comment syntaxes, so removing the annotation
+				// later doesn't break the commment
+				if (lineContent.content.length) {
+					commentRange.start = { line: tag.range.start.line }
+					commentRange.end = { ...innerRange.end }
+				}
+			} else if (lineIndex >= tag.range.end.line && lineContent.content === '---') {
+				// We encountered a separator line after the annotation tag, so this is a mixed
+				// comment with multiple pieces of content and we must limit the comment range
+				// to the current annotation (however, we still include the separator line)
+				commentRange.start = { line: tag.range.start.line }
+				commentRange.end = { line: lineIndex }
+				break
+			} else if (lineIndex >= tag.range.end.line && lineContent.content.startsWith('[!')) {
+				// We encountered the beginning of another annotation tag, so this is a mixed
+				// comment with multiple pieces of content and we must limit the comment range
+				// to the current annotation
+				commentRange.start = { line: tag.range.start.line }
+				commentRange.end = { line: lineIndex - 1 }
+				break
+			} else {
+				contents.push(lineContent.content)
+				contentRanges.push(lineContent.contentRange)
+			}
 		}
 
 		// Remove empty lines from the beginning and end of the content arrays

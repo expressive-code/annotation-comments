@@ -448,8 +448,8 @@ describe('parseParentComment()', () => {
 				])
 			})
 		})
-		describe('JSDoc-style comments', () => {
-			test('Covers an entire JSDoc comment if the annotation is its only content', () => {
+		describe('Handles special syntax requirements', () => {
+			test('Excludes JSDoc continuation line syntax "*" from annotation content', () => {
 				const lines = [
 					// JSDoc example with the entire block being indented by a tab
 					'\t/**',
@@ -469,7 +469,57 @@ describe('parseParentComment()', () => {
 					{ start: { line: 5, column: 4 }, end: { line: 5 } },
 				])
 			})
-			test.todo('Only covers the annotation lines if the JSDoc contains other content', () => {
+		})
+		describe('Handles mixed comments with other content besides the annotation', () => {
+			test('Excludes the outer comment syntax and all non-annotation lines', () => {
+				const lines = [
+					// Opening syntax that should not be included in the comment range
+					// as the comment also contains non-annotation content
+					'\t/**',
+					// Non-annotation content
+					'\t * Some JSDoc that is not part of the annotation comment.',
+					'\t *',
+					// Annotation content - these are the only lines that should be included
+					'\t * [!note] Annotation content',
+					'\t * that spans multiple lines',
+					'\t * until the comment ends',
+					// Closing syntax that should not be included in the comment range
+					// as the comment also contains non-annotation content
+					'\t */',
+					'\tsomeCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
+				expect(comment.commentRange).toEqual({ start: { line: 5 }, end: { line: 7 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 5, column: lines[3].indexOf('Annotation') }, end: { line: 5 } },
+					{ start: { line: 6, column: 4 }, end: { line: 6 } },
+					{ start: { line: 7, column: 4 }, end: { line: 7 } },
+				])
+			})
+			test('Excludes non-annotation content even without a line break before it', () => {
+				const lines = [
+					// Non-annotation content directly after the opening syntax
+					'\t/** Some JSDoc that is not part of the annotation comment.',
+					// Annotation content
+					'\t * [!note] Annotation content',
+					'\t * that spans multiple lines',
+					'\t * until the comment ends',
+					// Closing syntax that should not be included in the comment range
+					// as the comment also contains non-annotation content
+					'\t */',
+					'\tsomeCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
+				expect(comment.commentRange).toEqual({ start: { line: 3 }, end: { line: 5 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 3, column: lines[1].indexOf('Annotation') }, end: { line: 3 } },
+					{ start: { line: 4, column: 4 }, end: { line: 4 } },
+					{ start: { line: 5, column: 4 }, end: { line: 5 } },
+				])
+			})
+			test('Excludes the closing syntax even without a line break before it', () => {
 				const lines = [
 					'\t/**',
 					// Non-annotation content
@@ -477,13 +527,67 @@ describe('parseParentComment()', () => {
 					// Annotation content
 					'\t * [!note] Annotation content',
 					'\t * that spans multiple lines',
-					'\t * until the comment ends',
-					'\t */',
+					'\t * until the comment ends */',
 					'\tsomeCode()',
 				]
 				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
 				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until the comment ends'])
-				expect(comment.commentRange).toEqual({ start: { line: 4 }, end: { line: 6 } })
+				// Expect the closing syntax not to be included in the comment range
+				// as the comment also contains non-annotation content
+				expect(comment.commentRange).toEqual({ start: { line: 4 }, end: { line: 6, column: lines[4].indexOf(' */') } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 4, column: lines[2].indexOf('Annotation') }, end: { line: 4 } },
+					{ start: { line: 5, column: 4 }, end: { line: 5 } },
+					{ start: { line: 6, column: 4 }, end: { line: 6, column: lines[4].indexOf(' */') } },
+				])
+			})
+			test('Ends the annotation when encountering another annotation tag', () => {
+				const lines = [
+					// Opening syntax that should not be included in the comment range
+					// as the comment also contains non-annotation content
+					'\t/**',
+					// Annotation content - these are the lines that should be included
+					'\t * [!note] Annotation content',
+					'\t * that spans multiple lines',
+					'\t * until a new tag is encountered',
+					// Second annotation
+					'\t * [!test] Yet another annotation',
+					// Closing syntax that should not be included in the comment range
+					// as the comment also contains non-annotation content
+					'\t */',
+					'\tsomeCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until a new tag is encountered'])
+				// Do not include the second annotation in the comment range
+				expect(comment.commentRange).toEqual({ start: { line: 3 }, end: { line: 5 } })
+				expect(comment.contentRanges).toEqual([
+					{ start: { line: 3, column: lines[1].indexOf('Annotation') }, end: { line: 3 } },
+					{ start: { line: 4, column: 4 }, end: { line: 4 } },
+					{ start: { line: 5, column: 4 }, end: { line: 5 } },
+				])
+			})
+			test('Ends the annotation when encountering "---" on its own line', () => {
+				const lines = [
+					// Opening syntax that should not be included in the comment range
+					// as the comment also contains non-annotation content
+					'\t/**',
+					// Annotation content - these are the lines that should be included
+					'\t * [!note] Annotation content',
+					'\t * that spans multiple lines',
+					'\t * until "---" is encountered',
+					// Separator that is also considered part of the annotation comment range
+					'\t * ---',
+					// Non-annotation content
+					'\t * Some JSDoc that is not part of the annotation comment.',
+					// Closing syntax that should not be included in the comment range
+					// as the comment also contains non-annotation content
+					'\t */',
+					'\tsomeCode()',
+				]
+				const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+				expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines', 'until "---" is encountered'])
+				expect(comment.commentRange).toEqual({ start: { line: 3 }, end: { line: 6 } })
 				expect(comment.contentRanges).toEqual([
 					{ start: { line: 3, column: lines[1].indexOf('Annotation') }, end: { line: 3 } },
 					{ start: { line: 4, column: 4 }, end: { line: 4 } },
