@@ -595,6 +595,110 @@ describe('parseParentComment()', () => {
 				])
 			})
 		})
+		describe('Picks the best comment range if multiple options are present', () => {
+			describe('In case of multiple syntax options, prefers the one starting closest to the tag', () => {
+				test('Nested multi-line syntax on a single line', () => {
+					const lines = [
+						'{ /* ',
+						'This is some content inside a JSX-like comment',
+						// Nested multi-line annotation comment
+						'<!-- [!note] Look, a note! -->',
+						// Other content follows
+						'More content inside the JSX-like comment',
+						'*/ }',
+						'someCode()',
+					]
+					const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+					expect(comment.contents).toEqual(['Look, a note!'])
+					// Expect the space between the code and the comment to be included
+					expect(comment.commentRange).toEqual({ start: { line: 4 }, end: { line: 4 } })
+					expect(comment.contentRanges).toEqual([{ start: { line: 4, column: lines[2].indexOf('Look') }, end: { line: 4, column: lines[2].indexOf(' -->') } }])
+				})
+				test('Nested multi-line syntax on multiple lines', () => {
+					const lines = [
+						'{ /* ',
+						'This is some content inside a JSX-like comment',
+						// Nested multi-line annotation comment
+						'<!--',
+						'[!note] Look, a note!',
+						'-->',
+						// Other content follows
+						'More content inside the JSX-like comment',
+						'*/ }',
+						'someCode()',
+					]
+					const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+					expect(comment.contents).toEqual(['Look, a note!'])
+					// Expect the space between the code and the comment to be included
+					expect(comment.commentRange).toEqual({ start: { line: 4 }, end: { line: 6 } })
+					expect(comment.contentRanges).toEqual([{ start: { line: 5, column: lines[3].indexOf('Look') }, end: { line: 5 } }])
+				})
+			})
+			describe('If opening/closing options overlap, prefers the longest one', () => {
+				test('"<div> { /* [!ins] */ }"', () => {
+					const lines = [
+						// JSX annotation comment following an HTML tag
+						'<div> { /* [!ins] */ }',
+						'someCode()',
+					]
+					const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+					expect(comment.contents).toEqual([])
+					// Expect the space between the code and the comment to be included
+					expect(comment.commentRange).toEqual({ start: { line: 2, column: lines[0].indexOf(' { /*') }, end: { line: 2 } })
+					expect(comment.contentRanges).toEqual([])
+				})
+				test('"{ /* [!ins] */ } <div>"', () => {
+					const lines = [
+						// JSX annotation comment following an HTML tag
+						'  { /* [!ins] */ } <div>',
+						'someCode()',
+					]
+					const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+					expect(comment.contents).toEqual([])
+					// Expect the space between the comment and the code to be included,
+					// but not the indentation before the code
+					expect(comment.commentRange).toEqual({ start: { line: 2, column: 2 }, end: { line: 2, column: lines[0].indexOf('<div') } })
+					expect(comment.contentRanges).toEqual([])
+				})
+				test('"{ /* [!note] Annotation content */ }" on its own line', () => {
+					const lines = [
+						// Single-line variant
+						'{ /* [!note] Annotation content */ }',
+						'someCode()',
+					]
+					const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+					expect(comment.contents).toEqual(['Annotation content'])
+					// Expect the closing syntax not to be included in the comment range
+					// as the comment also contains non-annotation content
+					expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 2 } })
+					expect(comment.contentRanges).toEqual([
+						{
+							start: { line: 2, column: lines[0].indexOf('Annotation') },
+							end: { line: 2, column: lines[0].indexOf(' */ }') },
+						},
+					])
+				})
+				test('Multi-line comment including "{ /*", content lines, and "*/ }"', () => {
+					const lines = [
+						// Multi-line variant
+						'{ /*',
+						'  [!note] Annotation content',
+						'  that spans multiple lines',
+						'*/ }',
+						'someCode()',
+					]
+					const comment = getParentComment(getTestCode(lines.join('\n'))) as AnnotationComment
+					expect(comment.contents).toEqual(['Annotation content', 'that spans multiple lines'])
+					// Expect the closing syntax not to be included in the comment range
+					// as the comment also contains non-annotation content
+					expect(comment.commentRange).toEqual({ start: { line: 2 }, end: { line: 5 } })
+					expect(comment.contentRanges).toEqual([
+						{ start: { line: 3, column: lines[1].indexOf('Annotation') }, end: { line: 3 } },
+						{ start: { line: 4, column: 2 }, end: { line: 4 } },
+					])
+				})
+			})
+		})
 	})
 
 	/**
