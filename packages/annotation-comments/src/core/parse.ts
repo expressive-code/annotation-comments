@@ -1,27 +1,34 @@
-import type { AnnotationComment } from './types'
+import type { AnnotationComment, SourceRange } from './types'
 import { parseAnnotationTags } from '../parsers/annotation-tags'
 import { parseParentComment } from '../parsers/parent-comment'
+import { secondRangeIsInFirst } from '../internal/ranges'
 
 export type ParseAnnotationCommentsOptions = {
 	codeLines: string[]
-	validateAnnotationName?: (name: string) => boolean
 }
 
 export function parseAnnotationComments(options: ParseAnnotationCommentsOptions): AnnotationComment[] {
-	const { codeLines, validateAnnotationName } = options
+	const { codeLines } = options
 	const annotationComments: AnnotationComment[] = []
 
-	// Find annotation tags
+	// Find annotation tags in the code
 	const annotationTags = parseAnnotationTags({ codeLines })
+
+	let previousCommentRanges: SourceRange[] = []
 	annotationTags.forEach((tag) => {
-		// Ensure that the current annotation tag has not been ignored by an ´ignore-tags` directive. If it has, it will skip the tag and continue searching
-		// If given, call the `validateAnnotationName` handler function to check if the annotation name is valid. If this function returns `false`, skip the tag and continue searching
+		// Ignore the current tag if it is located inside the content ranges
+		// of the previously processed annotation comment
+		if (previousCommentRanges.some((range) => secondRangeIsInFirst(range, tag.range))) return
+
+		// TODO: Handle `[!ignore-tags]` logic
 
 		// Attempt to find a comment that the current annotation tag is located in
 		const comment = parseParentComment({ codeLines, tag })
 		if (!comment) return
 
 		// If a comment was found, add the tag and comment to the list of annotation comments
+		annotationComments.push(comment)
+		previousCommentRanges = comment.contentRanges
 	})
 
 	return annotationComments

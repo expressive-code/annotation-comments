@@ -1,6 +1,7 @@
 import type { AnnotationComment, AnnotationTag, SourceRange } from '../../core/types'
 import type { ParseParentCommentOptions } from '../parent-comment'
 import { escapeRegExp } from '../../internal/escaping'
+import { compareRanges, createRange } from '../../internal/ranges'
 import { getTextContentInLine } from '../text-content'
 
 type MultiLineCommentSyntax = {
@@ -390,29 +391,4 @@ function isValidFullMatch(match: Partial<MultiLineCommentSyntaxMatch>): match is
 	if (!startsAndEndsOnSameLine && (hasCodeBeforeStart || hasCodeAfterEnd)) return false
 
 	return true
-}
-
-function createRange(options: { line: string; lineIndex: number; startColumn: number; endColumn: number }) {
-	const { line, lineIndex, startColumn, endColumn } = options
-	const range: SourceRange = {
-		start: { line: lineIndex },
-		end: { line: lineIndex },
-	}
-	if (startColumn > 0) range.start.column = startColumn
-	if (endColumn < line.length) range.end.column = endColumn
-	return range
-}
-
-/**
- * Compares two source ranges by their start or end locations.
- *
- * Returns:
- * - `> 0` if the second location is **greater than** (comes after) the first,
- * - `< 0` if the second location is **smaller than** (comes before) the first, or
- * - `0` if they are equal.
- */
-function compareRanges(a: SourceRange, b: SourceRange, prop: 'start' | 'end'): number {
-	const aCol = a[prop].column ?? 0
-	const bCol = b[prop].column ?? 0
-	return a[prop].line - b[prop].line || aCol - bCol
 }
