@@ -232,7 +232,128 @@ countdown(5)
 		] as PartialAnnotationComment[])
 	})
 
-	// TODO: We also need to implement and test the `[!ignore-tags]` logic
+	describe('Supports ignoring unwanted annotations', () => {
+		test('[!ignore-tags] ignores all annotations on the next line', () => {
+			const lines = [
+				`// [!before] This is before any ignores`,
+				`console.log('Some code')`,
+				`// [!ignore-tags]`,
+				`testCode() // [!ignored] This should not be parsed`,
+				`// [!after] This should be parsed again`,
+			]
+			const comments = getComments(lines.join('\n'))
+			expect(comments).toHaveLength(2)
+			expect(comments).toMatchObject([
+				{
+					tag: { name: 'before', targetSearchQuery: undefined },
+					contents: [`This is before any ignores`],
+				},
+				{
+					tag: { name: 'after', targetSearchQuery: undefined },
+					contents: [`This should be parsed again`],
+				},
+			] as PartialAnnotationComment[])
+		})
+		test('[!ignore-tags:2] ignores the next two lines', () => {
+			const lines = [
+				`// [!before] This is before any ignores`,
+				`console.log('Some code')`,
+				`// [!ignore-tags:2]`,
+				`testCode() // [!ignored] This should not be parsed`,
+				`// [!ignored] Still ignored`,
+				`// [!after] This should be parsed again`,
+			]
+			const comments = getComments(lines.join('\n'))
+			expect(comments).toHaveLength(2)
+			expect(comments).toMatchObject([
+				{
+					tag: { name: 'before', targetSearchQuery: undefined },
+					contents: [`This is before any ignores`],
+				},
+				{
+					tag: { name: 'after', targetSearchQuery: undefined },
+					contents: [`This should be parsed again`],
+				},
+			] as PartialAnnotationComment[])
+		})
+		test('[!ignore-tags:note] ignores the next occurrence of "note"', () => {
+			const lines = [
+				`// [!before] This is before any ignores`,
+				`// [!ignore-tags:note]`,
+				`console.log('Some code')`,
+				`testCode() // [!note] This should not be parsed`,
+				`// [!note] This should be parsed again`,
+			]
+			const comments = getComments(lines.join('\n'))
+			expect(comments).toHaveLength(2)
+			expect(comments).toMatchObject([
+				{
+					tag: { name: 'before', targetSearchQuery: undefined },
+					contents: [`This is before any ignores`],
+				},
+				{
+					tag: { name: 'note', targetSearchQuery: undefined },
+					contents: [`This should be parsed again`],
+				},
+			] as PartialAnnotationComment[])
+		})
+		test('[!ignore-tags:note,ins:3] ignores the next 3 occurrences of "note" and "ins"', () => {
+			const lines = [
+				`// [!before] This is before any ignores`,
+				`// [!ignore-tags:note,ins:3]`,
+				`console.log('Some code') // [!ins]`,
+				`testCode() // [!note] This should not be parsed`,
+				`// [!ins] // [!note] Still ignored`,
+				`// [!ins] // [!note] Still ignored`,
+				`console.log('Test') // [!ins]`,
+				`// [!note] This should be parsed again`,
+			]
+			const comments = getComments(lines.join('\n'))
+			expect(comments).toHaveLength(3)
+			expect(comments).toMatchObject([
+				{
+					tag: { name: 'before', targetSearchQuery: undefined },
+					contents: [`This is before any ignores`],
+				},
+				{
+					tag: { name: 'ins', targetSearchQuery: undefined },
+					contents: [],
+				},
+				{
+					tag: { name: 'note', targetSearchQuery: undefined },
+					contents: [`This should be parsed again`],
+				},
+			] as PartialAnnotationComment[])
+		})
+		test('Ignores work in multi-line comments', () => {
+			const lines = [
+				`/*`,
+				`  [!before] This is before any ignores`,
+				`  [!ignore-tags]`,
+				`  [!note] This should not be parsed`,
+				`  [!note] This should be parsed again`,
+				`*/`,
+				`console.log('Some code')`,
+				`testCode() // [!ins]`,
+			]
+			const comments = getComments(lines.join('\n'))
+			expect(comments).toHaveLength(3)
+			expect(comments).toMatchObject([
+				{
+					tag: { name: 'before', targetSearchQuery: undefined },
+					contents: [`This is before any ignores`],
+				},
+				{
+					tag: { name: 'note', targetSearchQuery: undefined },
+					contents: [`This should be parsed again`],
+				},
+				{
+					tag: { name: 'ins', targetSearchQuery: undefined },
+					contents: [],
+				},
+			] as PartialAnnotationComment[])
+		})
+	})
 
 	function getComments(code: string) {
 		const codeLines = splitCodeLines(code)

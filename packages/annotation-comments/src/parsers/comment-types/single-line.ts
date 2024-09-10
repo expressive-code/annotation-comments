@@ -83,10 +83,16 @@ export function parseSingleLineParentComment(options: ParseParentCommentOptions)
 			comment.contents.push(tagLineContent.content)
 			comment.contentRanges.push(tagLineContent.contentRange)
 		}
-		// If there was only whitespace before the beginning of the comment,
-		// and no chaining was detected, try to expand the comment end location
+		// For supported annotation comments, allow expanding the comment end location
 		// and annotation content to subsequent comment lines
-		if (tagLine.slice(0, singleLineCommentSyntax.startColumn).trim() === '' && !chainedSingleLineCommentSyntax) {
+		const allowMultiLineExpansion =
+			// To allow expansion, the initial comment must start on its own line
+			tagLine.slice(0, singleLineCommentSyntax.startColumn).trim() === '' &&
+			// Chaining is not allowed
+			!chainedSingleLineCommentSyntax &&
+			// It doesn't make sense to expand annotation comments that don't support content
+			tag.name !== 'ignore-tags'
+		if (allowMultiLineExpansion) {
 			for (let lineIndex = tagLineIndex + 1; lineIndex < codeLines.length; lineIndex++) {
 				const line = codeLines[lineIndex]
 				const commentStart = line.search(/\S/)
