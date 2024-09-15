@@ -1,7 +1,8 @@
-import type { AnnotationComment } from '../../core/types'
+import type { AnnotationComment, SourceRange } from '../../core/types'
 import type { ParseParentCommentOptions } from '../parent-comment'
 import { escapeRegExp } from '../../internal/escaping'
 import { getTextContentInLine } from '../text-content'
+import { createRange } from '../../internal/ranges'
 
 const singleLineCommentSyntaxes: string[] = [
 	// JS, TS, Java, C, C++, C#, F#, Rust, Go, etc.
@@ -47,20 +48,17 @@ export function parseSingleLineParentComment(options: ParseParentCommentOptions)
 	const singleLineCommentSyntax = singleLineCommentSyntaxMatches.find((match) => match.endColumn === tag.range.start.column)
 	if (singleLineCommentSyntax) {
 		// We found a single-line annotation comment, so start collecting its details
-		const comment: AnnotationComment = {
-			tag,
-			contents: [],
-			commentRange: {
-				start: { line: tagLineIndex },
-				end: { line: tagLineIndex },
-			},
-			contentRanges: [],
-			targetRanges: [],
-		}
+		const commentRange = createRange({
+			codeLines,
+			start: { line: tagLineIndex },
+			end: { line: tagLineIndex },
+		})
+		const contents: string[] = []
+		const contentRanges: SourceRange[] = []
 		// If there is code before the comment, remember the comment start column
 		// to avoid deleting the entire line when removing the comment
 		if (tagLine.slice(0, singleLineCommentSyntax.startColumn).trim() !== '') {
-			comment.commentRange.start.column = singleLineCommentSyntax.startColumn
+			commentRange.start.column = singleLineCommentSyntax.startColumn
 		}
 		// For common Shiki transformer syntax compatibility, support chaining multiple
 		// single-line annotation comments on the same line
@@ -74,14 +72,14 @@ export function parseSingleLineParentComment(options: ParseParentCommentOptions)
 				tagLine.slice(match.endColumn).startsWith('[!')
 		)
 		if (chainedSingleLineCommentSyntax) {
-			comment.commentRange.end.column = chainedSingleLineCommentSyntax.startColumn
+			commentRange.end.column = chainedSingleLineCommentSyntax.startColumn
 		}
 		// If there is any non-whitespace content between the end of the annotation tag
 		// and the current end of the comment, add it to the contents and contentRanges arrays
-		const tagLineContent = getTextContentInLine({ codeLines, lineIndex: tagLineIndex, startColumn: tagEndColumn, endColumn: comment.commentRange.end.column })
+		const tagLineContent = getTextContentInLine({ codeLines, lineIndex: tagLineIndex, startColumn: tagEndColumn, endColumn: commentRange.end.column })
 		if (tagLineContent.content) {
-			comment.contents.push(tagLineContent.content)
-			comment.contentRanges.push(tagLineContent.contentRange)
+			contents.push(tagLineContent.content)
+			contentRanges.push(tagLineContent.contentRange)
 		}
 		// For supported annotation comments, allow expanding the comment end location
 		// and annotation content to subsequent comment lines
@@ -107,27 +105,37 @@ export function parseSingleLineParentComment(options: ParseParentCommentOptions)
 					// Stop if the line has `---` as its only text content
 					if (lineContent.content === '---') {
 						// Make the line part of the comment, but don't add its content
-						comment.commentRange.end = { line: lineIndex }
+						commentRange.end = { line: lineIndex }
 						break
 					}
 					// Stop if the line starts with an annotation tag opening sequence `[!`
 					if (lineContent.content.startsWith('[!')) break
 					// Otherwise, add the content and expand the comment range
 					// to cover the additional full line
-					comment.contents.push(lineContent.content)
-					comment.contentRanges.push(lineContent.contentRange)
-					comment.commentRange.end = { line: lineIndex }
+					contents.push(lineContent.content)
+					contentRanges.push(lineContent.contentRange)
+					commentRange.end = { line: lineIndex }
 				} else {
 					// Comment lines without content are allowed, so an empty string to the content
 					// and expand the comment range to cover the additional full line
 					const column = Math.min(possibleContentStart, line.length)
-					comment.contents.push('')
-					comment.contentRanges.push({ start: { line: lineIndex, column }, end: { line: lineIndex, column } })
-					comment.commentRange.end = { line: lineIndex }
+					contents.push('')
+					contentRanges.push({ start: { line: lineIndex, column }, end: { line: lineIndex, column } })
+					commentRange.end = { line: lineIndex }
 				}
 			}
 		}
 
-		return comment
+		// For single-line comments, the annotation range is always equal to the comment range
+		const annotationRange = createRange({ codeLines, start: commentRange.start, end: commentRange.end })
+
+		return {
+			tag,
+			contents,
+			commentRange,
+			annotationRange,
+			contentRanges,
+			targetRanges: [],
+		}
 	}
 }

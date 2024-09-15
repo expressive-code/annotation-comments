@@ -52,6 +52,8 @@ export default defineConfig({
 						`Also note that we just added a [!note] tag to an existing`,
 						`JSDoc comment to create this note.`,
 					],
+					commentRange: { start: { line: 2 }, end: { line: 10 } },
+					annotationRange: { start: { line: 5 }, end: { line: 9 } },
 				},
 				{
 					tag: { name: 'ins', targetSearchQuery: undefined },
@@ -109,6 +111,8 @@ export default defineConfig({
 						`As this [!note] points out, we let the browser`,
 						`create a gradient for us here.`,
 					],
+					commentRange: { start: { line: 6 }, end: { line: 8 } },
+					annotationRange: { start: { line: 6 }, end: { line: 8 } },
 				},
 			] as PartialAnnotationComment[])
 		})
@@ -145,6 +149,8 @@ const { title } = Astro.props
 						`By destructuring the \`Astro.props\` object,`,
 						`we can access the \`title\` prop passed to this component.`,
 					],
+					commentRange: { start: { line: 5 }, end: { line: 6 } },
+					annotationRange: { start: { line: 5 }, end: { line: 6 } },
 				},
 				{
 					tag: { name: 'note', targetSearchQuery: '{title}' },
@@ -208,17 +214,17 @@ countdown(5)
 		expect(comments).toMatchObject([
 			{
 				tag: { name: 'note', targetSearchQuery: undefined },
-				commentRange: { start: { line: 0 }, end: { line: 0, column: lines[0].indexOf(' // [!ins]') } },
+				annotationRange: { start: { line: 0 }, end: { line: 0, column: lines[0].indexOf(' // [!ins]') } },
 				contents: [`This is the note content.`],
 			},
 			{
 				tag: { name: 'ins', targetSearchQuery: undefined },
-				commentRange: { start: { line: 0, column: lines[0].indexOf(' // [!ins]') }, end: { line: 0 } },
+				annotationRange: { start: { line: 0, column: lines[0].indexOf(' // [!ins]') }, end: { line: 0 } },
 				contents: [],
 			},
 			{
 				tag: { name: 'mark', targetSearchQuery: undefined },
-				commentRange: {
+				annotationRange: {
 					start: { line: 2, column: lines[2].indexOf(' // [!mark]') },
 					end: { line: 2, column: lines[2].indexOf(' // [!note]') },
 				},
@@ -226,7 +232,7 @@ countdown(5)
 			},
 			{
 				tag: { name: 'note', targetSearchQuery: undefined },
-				commentRange: { start: { line: 2, column: lines[2].indexOf(' // [!note]') }, end: { line: 2 } },
+				annotationRange: { start: { line: 2, column: lines[2].indexOf(' // [!note]') }, end: { line: 2 } },
 				contents: [`It also works at the end of a line.`],
 			},
 		] as PartialAnnotationComment[])
@@ -342,10 +348,14 @@ countdown(5)
 				{
 					tag: { name: 'before', targetSearchQuery: undefined },
 					contents: [`This is before any ignores`],
+					commentRange: { start: { line: 0 }, end: { line: 5 } },
+					annotationRange: { start: { line: 1 }, end: { line: 1 } },
 				},
 				{
 					tag: { name: 'note', targetSearchQuery: undefined },
 					contents: [`This should be parsed again`],
+					commentRange: { start: { line: 0 }, end: { line: 5 } },
+					annotationRange: { start: { line: 4 }, end: { line: 4 } },
 				},
 				{
 					tag: { name: 'ins', targetSearchQuery: undefined },

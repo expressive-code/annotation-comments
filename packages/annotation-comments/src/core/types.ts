@@ -1,7 +1,29 @@
 export type AnnotationComment = {
 	tag: AnnotationTag
 	contents: string[]
+	/**
+	 * The outer range of the parent comment that contains the annotation,
+	 * including the comment's opening and closing syntax.
+	 *
+	 * Note that multi-line comments can contain multiple annotations and non-annotation content.
+	 * In such cases, {@link AnnotationComment.commentRange} is larger than
+	 * {@link AnnotationComment.annotationRange}.
+	 */
 	commentRange: SourceRange
+	/**
+	 * The outer range of the annotation, covering both the annotation tag and
+	 * any optional content.
+	 *
+	 * If the parent comment only contains this annotation and nothing else,
+	 * this range is equal to {@link AnnotationComment.commentRange}, which includes
+	 * the comment's opening and closing syntax. This allows removing the annotation
+	 * from the code without leaving an empty comment behind.
+	 *
+	 * In all other cases, this range covers only the parts inside the parent comment
+	 * that belong to this annotation. This allows removing the annotation without
+	 * affecting other annotations or non-annotation content inside the parent comment.
+	 */
+	annotationRange: SourceRange
 	contentRanges: SourceRange[]
 	targetRanges: SourceRange[]
 }

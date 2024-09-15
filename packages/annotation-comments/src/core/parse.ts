@@ -17,11 +17,11 @@ export function parseAnnotationComments(options: ParseAnnotationCommentsOptions)
 	const ignoreCountPerTagName = new Map<string, number>()
 	let tagsIgnoredUntilLineIndex = -1
 
-	let previousCommentRanges: SourceRange[] = []
+	let previousContentRanges: SourceRange[] = []
 	annotationTags.forEach((tag) => {
 		// Ignore the current tag if it is located inside the content ranges
 		// of the previously processed annotation comment
-		if (previousCommentRanges.some((range) => secondRangeIsInFirst(range, tag.range))) return
+		if (previousContentRanges.some((range) => secondRangeIsInFirst(range, tag.range))) return
 
 		// Attempt to find a comment that the current annotation tag is located in
 		const comment = parseParentComment({ codeLines, tag })
@@ -38,7 +38,7 @@ export function parseAnnotationComments(options: ParseAnnotationCommentsOptions)
 		// Allow creating new ignores
 		if (tag.name === 'ignore-tags') {
 			// By definition, `ignore-tags` must be on its own line
-			if (comment.commentRange.start.column || comment.commentRange.end.column) return
+			if (comment.annotationRange.start.column || comment.annotationRange.end.column) return
 			const ignoreRange = tag.relativeTargetRange ?? 1
 			if (typeof tag.targetSearchQuery === 'string') {
 				const targetTagNames = tag.targetSearchQuery.split(',').map((name) => name.trim())
@@ -53,7 +53,7 @@ export function parseAnnotationComments(options: ParseAnnotationCommentsOptions)
 
 		// If we arrive here, add the tag and comment to the list of annotation comments
 		annotationComments.push(comment)
-		previousCommentRanges = comment.contentRanges
+		previousContentRanges = comment.contentRanges
 	})
 
 	return annotationComments

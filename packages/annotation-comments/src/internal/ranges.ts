@@ -1,13 +1,16 @@
-import type { SourceRange } from '../core/types'
+import type { SourceLocation, SourceRange } from '../core/types'
 
-export function createRange(options: { line: string; lineIndex: number; startColumn: number; endColumn: number }) {
-	const { line, lineIndex, startColumn, endColumn } = options
+/**
+ * Creates a new source range object from the given start and end locations.
+ */
+export function createRange(options: { codeLines: string[]; start: SourceLocation; end: SourceLocation }) {
+	const { codeLines, start, end } = options
 	const range: SourceRange = {
-		start: { line: lineIndex },
-		end: { line: lineIndex },
+		start: { line: start.line },
+		end: { line: end.line },
 	}
-	if (startColumn > 0) range.start.column = startColumn
-	if (endColumn < line.length) range.end.column = endColumn
+	if (start.column ?? 0 > 0) range.start.column = start.column
+	if (end.column && end.column < (codeLines[end.line] ?? '').length) range.end.column = end.column
 	return range
 }
 
