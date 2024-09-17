@@ -248,13 +248,12 @@ countdown(5)
 				`// [!after] This should be parsed again`,
 			]
 			const comments = getComments(lines.join('\n'))
-			expect(comments).toHaveLength(2)
 			expect(comments).toMatchObject([
 				{
 					tag: { name: 'before', targetSearchQuery: undefined },
 					contents: [`This is before any ignores`],
 				},
-				// TODO: Expect the ignore-tags annotation comment to be present as well
+				{ tag: { name: 'ignore-tags' } },
 				{
 					tag: { name: 'after', targetSearchQuery: undefined },
 					contents: [`This should be parsed again`],
@@ -271,13 +270,12 @@ countdown(5)
 				`// [!after] This should be parsed again`,
 			]
 			const comments = getComments(lines.join('\n'))
-			expect(comments).toHaveLength(2)
 			expect(comments).toMatchObject([
 				{
 					tag: { name: 'before', targetSearchQuery: undefined },
 					contents: [`This is before any ignores`],
 				},
-				// TODO: Expect the ignore-tags annotation comment to be present as well
+				{ tag: { name: 'ignore-tags' } },
 				{
 					tag: { name: 'after', targetSearchQuery: undefined },
 					contents: [`This should be parsed again`],
@@ -293,13 +291,12 @@ countdown(5)
 				`// [!note] This should be parsed again`,
 			]
 			const comments = getComments(lines.join('\n'))
-			expect(comments).toHaveLength(2)
 			expect(comments).toMatchObject([
 				{
 					tag: { name: 'before', targetSearchQuery: undefined },
 					contents: [`This is before any ignores`],
 				},
-				// TODO: Expect the ignore-tags annotation comment to be present as well
+				{ tag: { name: 'ignore-tags' } },
 				{
 					tag: { name: 'note', targetSearchQuery: undefined },
 					contents: [`This should be parsed again`],
@@ -318,13 +315,12 @@ countdown(5)
 				`// [!note] This should be parsed again`,
 			]
 			const comments = getComments(lines.join('\n'))
-			expect(comments).toHaveLength(3)
 			expect(comments).toMatchObject([
 				{
 					tag: { name: 'before', targetSearchQuery: undefined },
 					contents: [`This is before any ignores`],
 				},
-				// TODO: Expect the ignore-tags annotation comment to be present as well
+				{ tag: { name: 'ignore-tags' } },
 				{
 					tag: { name: 'ins', targetSearchQuery: undefined },
 					contents: [],
@@ -347,7 +343,6 @@ countdown(5)
 				`testCode() // [!ins]`,
 			]
 			const comments = getComments(lines.join('\n'))
-			expect(comments).toHaveLength(3)
 			expect(comments).toMatchObject([
 				{
 					tag: { name: 'before', targetSearchQuery: undefined },
@@ -355,7 +350,7 @@ countdown(5)
 					commentRange: { start: { line: 0 }, end: { line: 5 } },
 					annotationRange: { start: { line: 1 }, end: { line: 1 } },
 				},
-				// TODO: Expect the ignore-tags annotation comment to be present as well
+				{ tag: { name: 'ignore-tags' } },
 				{
 					tag: { name: 'note', targetSearchQuery: undefined },
 					contents: [`This should be parsed again`],

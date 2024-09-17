@@ -48,7 +48,8 @@ export function parseAnnotationComments(options: ParseAnnotationCommentsOptions)
 			} else if (ignoreRange > 0) {
 				tagsIgnoredUntilLineIndex = tag.range.end.line + ignoreRange
 			}
-			return
+			// We still want to add this valid ignore-tags comment to the result array
+			// to allow it to be removed by `cleanCode()` later, so we don't return here
 		}
 
 		// If we arrive here, add the tag and comment to the list of annotation comments
