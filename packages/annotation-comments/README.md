@@ -27,7 +27,150 @@ If you are looking for a ready-to-use solution that uses this package to support
 npm install annotation-comments
 ```
 
-## Parts of an annotation comment
+## Usage
+
+The following example shows how you can use this library to parse an annotated code snippet and extract the annotation comments from it:
+
+```ts
+import { parseAnnotationComments, cleanCode } from 'annotation-comments';
+
+const code = `
+// [!note] This is a note annotation.
+console.log('Some code');
+`;
+
+const codeLines = code.trim().split(/\r?\n/);
+
+const annotationComments = parseAnnotationComments({ codeLines });
+
+cleanCode({ annotationComments, codeLines });
+```
+
+For an explanation of the options and return values of the `parseAnnotationComments` and `cleanCode` functions, see the [API section](#api).
+
+## API
+
+### parseAnnotationComments()
+
+This function parses the given array of code lines to find all annotation comments and their targets.
+
+It expects a single object argument with the following properties:
+
+```ts
+type ParseAnnotationCommentsOptions = {
+  codeLines: string[],
+}
+```
+
+Its return value is an array of `AnnotationComment` objects:
+
+```ts
+type AnnotationComment = {
+  tag: AnnotationTag
+  contents: string[]
+  commentRange: SourceRange
+  annotationRange: SourceRange
+  contentRanges: SourceRange[]
+  targetRanges: SourceRange[]
+}
+
+export type AnnotationTag = {
+  name: string
+  targetSearchQuery?: string | RegExp | undefined
+  relativeTargetRange?: number | undefined
+  rawTag: string
+  range: SourceRange
+}
+
+export type SourceRange = {
+  start: SourceLocation
+  end: SourceLocation
+}
+
+export type SourceLocation = {
+  line: number
+  column?: number | undefined
+}
+```
+
+### cleanCode()
+
+This function prepares annotated code lines for display or copying to the clipboard by making it look like regular (non-annotated) code again.
+
+It will collect all necessary edits and apply them to the code in reverse order (from the last edit location to the first) to avoid having to update the locations of all remaining annotations after each edit.
+
+The function expects a single object argument with the following properties:
+
+```ts
+type CleanCodeOptions = {
+  codeLines: string[]
+  annotationComments: AnnotationComment[]
+  removeAnnotationContents?: boolean | ((context: RemoveAnnotationContentsContext) => boolean)
+  updateTargetRanges?: boolean
+  handleRemoveLine?: (context: HandleRemoveLineContext) => boolean
+  handleEditLine?: (context: HandleEditLineContext) => boolean
+}
+
+type RemoveAnnotationContentsContext = {
+  comment: AnnotationComment
+}
+
+type HandleRemoveLineContext = {
+  lineIndex: number
+  codeLines: string[]
+}
+
+type HandleEditLineContext = {
+  lineIndex: number
+  startColumn: number
+  endColumn: number
+  codeLines: string[]
+}
+```
+
+#### Configuration options
+
+Without any additional options, `cleanCode()` will modify the given code lines in place to remove all given annotation tags.
+
+To change this behavior, you can provide the following additional options:
+
+##### removeAnnotationContents
+
+- Type: `boolean` \| `({ comment: AnnotationComment }) => boolean`
+- Default: ``false``
+
+When encountering annotation comments that have additional contents after the annotation tag, the default cleanup logic will remove the annotation tag, but keep the content. For example, `// [!note] Call the function` will become `// Call the function` after cleaning.
+
+Setting this option to `true` allows you to remove the content as well. Alternatively, you can provide a handler function to determine the behavior for each annotation comment individually.
+
+In any case, if a comment becomes empty through the cleanup process, it will be removed entirely.
+
+##### updateTargetRanges
+
+- Type: `boolean`
+- Default: ``true``
+
+If set to `true`, any annotation target ranges will be updated while cleaning to reflect the changes made to the code lines. This is useful if you want to use the target ranges for further processing after the code has been cleaned.
+
+##### handleRemoveLine
+
+- Type: `({ lineIndex: number; codeLines: string[] }) => boolean`
+- Default: `undefined`
+
+If given, this handler function will be called during the cleanup process for each line that is about to be removed from `codeLines`.
+
+The handler can return `true` to indicate that it has taken care of the change and that the default logic (which edits the `codeLines` array in place) should be skipped.
+
+##### handleEditLine
+
+- Type: `({ lineIndex: number; startColumn: number; endColumn: number; newText: string; codeLines: string[] }) => boolean`
+- Default: `undefined`
+
+If given, this handler function will be called during the cleanup process for each inline edit that is about to performed in `codeLines`. The edit process replaces all text inside the column range from `startColumn` to `endColumn` with `newText`.
+
+The handler can return `true` to indicate that it has taken care of the change and that the default logic (which edits the `codeLines` array in place) should be skipped.
+
+## Annotation comment syntax
 
 Annotation comments consist of the following parts:
 
@@ -146,13 +289,13 @@ By default, multi-line content ends at the end of its parent comment block. Howe
   console.log('Test');
   ```
 
-## Adding annotations to your code
+## Annotation comment usage guidelines
 
-To add annotations to your code, follow these guidelines:
+To be recognized by the parser, annotation comments must follow a set of guidelines. These guidelines ensure that the parser can accurately detect annotations in code snippets of any common language and are designed to prevent false positives as much as possible.
 
 ### All annotations must be placed inside comments
 
-This ensures that your code remains valid and functional, even if the annotation comments are removed during rendering.
+Comments are required to ensure that annotations cannot change the logic of your code, and that it remains valid and functional both in its annotated and non-annotated form.
 
 ### A supported comment syntax must be used
 
@@ -321,177 +464,21 @@ Note: Accurately detecting single-line and multi-line comments in all supported 
 
   This rule also improves the heuristic comment detection and prevents false positives.
 
-## Processing logic
-
-```ts
-import { parseAnnotationComments } from 'annotation-comments';
-
-const code = `
-// [!note] This is a note annotation.
-console.log('Some code');
-`;
-
-const codeLines = code.trim().split(/\r?\n/);
-
-const annotationComments = parseAnnotationComments({
-  codeLines,
-  validateAnnotationName: (name) => name === 'note',
-});
-
-removeAnnotationComments({
-  annotationComments,
-  codeLines,
-  updateTargetRanges: true,
-});
-```
-
-### parseAnnotationComments()
-
-This function is the main entry point for processing annotation comments in code snippets.
-
-It takes the following parameters:
-
-```ts
-type ParseAnnotationCommentsOptions = {
-  codeLines: string[],
-  validateAnnotationName?: (name: string) => boolean,
-}
-```
-
-Its return value is an array of `AnnotationComment` objects:
-
-```ts
-type AnnotationComment = {
-  name: string,
-  targetSearchQuery?: string,
-  relativeTargetRange?: number,
-  rawTag: string,
-  contents: string[],
-  commentRange: SourceRange,
-  tagRange: SourceRange,
-  contentRanges: SourceRange[],
-  targetRanges: SourceRange[],
-}
-
-type SourceRange = {
-  startLine: number,
-  endLine: number,
-  // For inline ranges, startCol and endCol are also set
-  startCol?: number,
-  endCol?: number,
-}
-```
-
-The function follows these steps to process the code:
-
-#### Step 1: Parsing the code to find all annotation comments
-
-- The function goes through the given code line by line, looking for strings that match the annotation comment syntax. If a match is found, it will:
-  - Extract the annotation name, optional target search query, and optional relative target range from the annotation tag
-  - Ensure that the current annotation tag has not been ignored by an `ignore-tags` directive. If it has, it will skip the tag and continue searching
-  - If given, call the `validateAnnotationName` handler function to check if the annotation name is valid. If this function returns `false`, skip the tag and continue searching
-  - **Handle the current annotation tag if it's inside a single-line comment:** Try to find the beginning sequence of a single-line comment directly before the annotation tag, with no non-whitespace character before and after the beginning sequence. If found, it will:
-    - Mark the location of the beginning sequence as beginning of the comment
-    - Support chaining of single-line comments on the same line
-      - After the current annotation tag, look for a repetition of the same comment beginning sequence + annotation tag syntax. If found, this is a case of chaining, so mark the location of the next beginning sequence as the end of the current comment.
-      - If no chaining is found, mark the end of the line as the current end of the comment (this may change later)
-    - Add any text after the annotation tag until the current end of the comment to the annotation's **contents**
-    - If there was only whitespace before the beginning of the comment (= the comment was on its own line), and no chaining was detected (= end of comment matches end of line), try to expand the comment end location and annotation content to all subsequent lines until a line is found that either doesn't start with the same single-line comment beginning sequence (only preceded by optional whitespace characters), that starts with another valid annotation tag, or that has `---` as its only text content.
-    - End processing the current annotation tag and continue searching for the next one
-  - **Handle the current annotation tag if it's inside a multi-line comment:** No single-line comment was found, so now try to find a matching pair of beginning and ending sequence of a supported multi-line comment syntax around the match:
-    - Walk backwards, passing each character into an array of parser functions that are each responsible for one supported comment syntax. If a parser function returns a definite result, which can either be a match or a failure, stop calling this parser.
-      - In the JSDoc parser, on the first processed line, allow whitespace and require either a single `*` character or the opening sequence `/**` surrounded by whitespace to be present before the tag. If not, return a failure. If the opening is found, return a match. Otherwise, keep going with all previous lines and expect the same, except that there now can be arbitrary other content between the mandatory `*` and the beginning of the line.
-      - In all other parsers, on the first processed line, allow only whitespace or the opening sequence surrounded by whitespace to be present before the tag. If not, return a failure. If the opening is found, return a match. Otherwise, keep going with all previous lines, but now also allow other arbitrary content. If the beginning of the code is reached, return a failure.
-    - If none of the parsers returned a match, skip processing the current annotation tag and continue searching for the next one
-    - Otherwise, walk forwards, passing each character into a new array of parser functions that are each responsible for one supported multi-line comment syntax. If a parser function returns a definite result, which can either be a match or a failure, stop calling this parser.
-      - In the JSDoc parser, on the first processed line, allow arbitrary content or the closing sequence `*/` surrounded by whitespace. If the closing is found, return a match. Otherwise, keep going with all subsequent lines, and either expect whitespace followed by a mantatory `*` and then arbitrary content. If the closing sequence surrounded by whitespace is encountered at any point, return a match. If the end of the code is reached, return a failure.
-      - In all other parsers, just accept any content while looking for the closing sequence surrounded by whitespace on all lines. If it is found, return a match. If the end of the code is reached, return a failure.
-    - Now filter the backwards and forwards results, removing any non-pairs. If the opening and closing sequences of multiple pairs overlap, only keep the longest sequence (this ensures that we're capturing `{ /* */ }` instead of just the inner `/* */`). Finally, keep only the innermost pair.
-    - If no pair was found, skip processing the current annotation tag and continue searching for the next one
-    - Otherwise:
-      - Check rule "Comments must not be placed between code on the same line"
-        - If the comment starts and ends on the same line, and there is non-whitespace content both before and after the comment, skip processing the current annotation tag and continue searching for the next one
-      - Check rule "Comments spanning multiple lines must not share any lines with code"
-        - If the comment starts and ends on different lines, and there is non-whitespace content either before the start or after the end of the comment, skip processing the current annotation tag and continue searching for the next one
-      - Finish processing the current annotation tag and continue searching for the next one
-
-#### Step 2: Finding the targets of all annotations
-
-- Now, the function goes through all identified annotation comments and does the following:
-  - If the annotation has **no relative target range** given, automatically determine it:
-    - If the annotation has **no target search query**, it attempts to target full lines:
-      - If the **annotation comment is on the same line as content** (= annotation start line contains content other than whitespace or other annotation comments), the target range is the annotation comment line.
-      - Otherwise, find the first line above and first line below that don't fully consist of annotation comments
-        - If the **line below has content**, it is the target range.
-        - Otherwise, if the **line above has content**, it is the target range.
-        - Otherwise (**both lines are empty**), there is no target range (same as the relative range `:0`).
-    - Otherwise, the annotation **has a target search query**, so determine the search direction:
-      - If the **annotation comment is on the same line as content** (= annotation start line contains content other than whitespace or other annotation comments), the direction depends on where the content is in relation to the comment.
-      - Otherwise, find the first line above and first line below that don't fully consist of annotation comments
-        - If the **line above has content** and the **line below is empty**, the relative range is `:-1`.
-        - Otherwise, the relative range is `:1`.
-  - If a target search query is present, **perform the search** to determine the target range(s):
-    - The target search query can be a simple string, a single-quoted string, a double-quoted string, or a regular expression. Regular expressions can optionally contain capture groups, which will then be used to determine the target range(s) instead of the full match.
-    - The search is performed line by line, starting at the start or end of the annotation comment and going in the direction determined by the relative target range that was either given or automatically determined as described above.
-    - Before searching a line for matches, all characters that lie within the `outerRange` of any annotation comment are removed from the line. If matches are found, the matched ranges are adjusted to include the removed characters.
-    - Each match is added to the `targetRanges` until the number of matches equals the absolute value of the relative target range, or the end of the code is reached.
-    - In the case of regular expressions with capture groups, a single match can result in multiple target ranges, one for each capture group.
-
-### removeAnnotationComments()
-
-This function can be used to remove the parsed annotation comments from the code lines. You can either let it perform the edits in the given code lines array, or provide custom handlers to control the removal process.
-
-It takes the following parameters:
-
-```ts
-type RemoveAnnotationCommentsOptions = {
-  annotationComments: AnnotationComment[],
-  codeLines: string[],
-  updateTargetRanges?: boolean,
-  handleRemoveLine?: ({
-    commentBeingRemoved: AnnotationComment
-    codeLines: string[]
-    lineIndex: number
-  }) => boolean,
-  handleRemoveInlineRange?: ({
-    commentBeingRemoved: AnnotationComment
-    codeLines: string[]
-    lineIndex: number
-    startCol: number
-    endCol: number
-  }) => boolean,
-}
-```
-
-All edits will be carried out in reverse order (from the last annotation comment to the first) to avoid having to update the locations of all remaining annotations after each edit.
-
-If the optional property `updateTargetRanges` is set to `true`, the target ranges of the annotations will be updated to reflect the changes made to the code lines. This is useful if you want to use the target ranges for further processing after the annotations have been removed.
-
-If given, the optional handlers `handleRemoveLine` and `handleRemoveInlineRange` will be called during the removal process. They can return `true` to indicate that the default removal logic (which edits the given `codeLines` array in place) should be skipped for the current line or inline range.
-
-The logic used to determine the edits is as follows:
-
-- If the comment was ended by the special `---` terminator line, include it in the outer range to be removed
-- Remove the entire outer range of the comment from the source code
-- Remove any now trailing whitespace from the line where the comment started
-- If removal of the comment caused the starting line to be empty, remove it as well
-- If the comment ended on a different line, and its removal caused the ending line to be empty, remove it as well
-
 ## Troubleshooting
 
-### Fixing an annotation that doesn't get processed
+### Fixing an annotation comment that doesn't get parsed
 
-If an annotation you've added to your code does not get processed by `annotation-comments`, check if the following conditions are met:
+If an annotation comment you've added to a code snippet does not get returned by the [`parseAnnotationComments()`](#parseannotationcomments) function, you can use the following checklist for troubleshooting:
 
-- Does your annotation tag use the [correct syntax](#annotation-tags)?
-- Is your annotation tag placed inside a comment that [follows the guidelines](#adding-annotations-to-your-code)?
+- Does your annotation comment use the [correct syntax](#annotation-comment-syntax)?
+- Does its placement in the surrounding code follow the [usage guidelines](#annotation-comment-usage-guidelines)?
 - If the optional `validateAnnotationName` handler is used, does it return `true` for the annotation name you've used?
 
-### Opting out of annotation processing
+### Ignoring annotation comments in certain parts of your code
 
-You may want to prevent `annotation-comments` from processing annotation comments in certain parts of your code. This can be useful if you're writing a guide about using annotation comments themselves, or if the heuristic used by `annotation-comments` incorrectly recognizes parts of your code as annotation comments.
+You may want to prevent certain annotation comments in your code from being processed. This can be useful if you're writing a guide about using annotation comments themselves, or if the heuristic used by `annotation-comments` incorrectly recognizes parts of your code as annotation comments.
 
-To opt out, insert a new line in your code that only contains the special tag `[!ignore-tags]` in a comment:
+To solve this, you can place the special annotation comment `[!ignore-tags]` on its own line before the annotation comments you want to ignore. The following variations are available:
 
 - The base syntax `[!ignore-tags]` will ignore all tags on the next line.
 - You can optionally specify the tag names to ignore, e.g. `[!ignore-tags:note,ins]` will ignore the next match of each tag name.
@@ -503,9 +490,13 @@ Have a look at the following example, where a sequence that starts a single-line
 
 ```js
 ❌ Problem:
-const code = 'Test: // [!note] Looks like a comment, gets removed and breaks the code';
+const code = 'Test: // [!note] This looks like an annotation comment to the parser, but removing it would break the code';
 
 ✅ Solution:
 // [!ignore-tags]
 const code = 'Test: // [!note] This just remains a string now as expected';
 ```
+
+When passing the "Solution" code above to the [`parseAnnotationComments()`](#parseannotationcomments) function, the returned array will only contain the `ignore-tags` annotation comment, and no incorrectly parsed `note`.
+
+Passing this array to the [`cleanCode()`](#cleancode) function will remove the `ignore-tags` annotation comment, resulting in clean working code.

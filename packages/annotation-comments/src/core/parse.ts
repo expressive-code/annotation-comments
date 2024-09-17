@@ -56,5 +56,7 @@ export function parseAnnotationComments(options: ParseAnnotationCommentsOptions)
 		previousContentRanges = comment.contentRanges
 	})
 
+	// TODO: Call findAnnotationTargets() here
+
 	return annotationComments
 }
