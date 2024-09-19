@@ -1,5 +1,6 @@
 import type { AnnotationComment, SourceRange } from './types'
-import { compareRanges, createSingleLineRange } from '../internal/ranges'
+import { compareRanges, createRange, createSingleLineRange } from '../internal/ranges'
+import { getGroupIndicesFromRegExpMatch } from '../internal/regexps'
 
 export type FindAnnotationTargetsOptions = {
 	codeLines: string[]
@@ -9,44 +10,68 @@ export type FindAnnotationTargetsOptions = {
 export function findAnnotationTargets(options: FindAnnotationTargetsOptions) {
 	const { codeLines, annotationComments } = options
 
-	// TODO: Finish implementation
 	annotationComments.forEach((comment) => {
-		const annotationLineIndex = comment.annotationRange.start.line
-		const annotationLineContents = getNonAnnotationCommentLineContents(annotationLineIndex, options)
+		const { tag, commentRange, annotationRange, targetRanges } = comment
 
-		// If the annotation has no relative target range and no target search query,
-		// try to find a nearby target line that is not empty and not an annotation comment
-		if (comment.tag.relativeTargetRange === undefined && comment.tag.targetSearchQuery === undefined) {
-			// Check if the annotation line itself is a valid target
-			if (annotationLineContents.hasNonWhitespaceContent) {
-				return comment.targetRanges.push(createSingleLineRange(annotationLineIndex))
+		// We don't need to search for `ignore-tags` annotation targets
+		// as ignores are handled by the annotation comment parser
+		if (tag.name === 'ignore-tags') return
+
+		const commentLineIndex = commentRange.start.line
+		const commentLineContents = getNonAnnotationCommentLineContents(commentLineIndex, options)
+		let { relativeTargetRange } = tag
+		const { targetSearchQuery } = tag
+
+		// Handle annotations without a target search query (they target full lines)
+		if (targetSearchQuery === undefined) {
+			// If the annotation has no relative target range, try to find a nearby target line
+			// that is not empty and not an annotation comment
+			if (relativeTargetRange === undefined) {
+				// Check if the annotation comment line itself is a valid target
+				if (commentLineContents.hasNonWhitespaceContent) {
+					return targetRanges.push(createSingleLineRange(commentLineIndex))
+				}
+				// Otherwise, scan for a target line below
+				const potentialTargetBelow = getFirstNonAnnotationCommentLineContents(commentLineIndex, 'below', options)
+				if (potentialTargetBelow?.hasNonWhitespaceContent) {
+					return targetRanges.push(createSingleLineRange(potentialTargetBelow.lineIndex))
+				}
+				// Finally, scan for a target line above
+				const potentialTargetAbove = getFirstNonAnnotationCommentLineContents(commentLineIndex, 'above', options)
+				if (potentialTargetAbove?.hasNonWhitespaceContent) {
+					return targetRanges.push(createSingleLineRange(potentialTargetAbove.lineIndex))
+				}
+				// If we arrive here, there is no target range (same as the relative range `:0`),
+				// so don't do anything
+				return
 			}
-			// Otherwise, scan for a target line below
-			const potentialTargetBelow = getFirstNonAnnotationCommentLineContents(annotationLineIndex, 'below', options)
-			if (potentialTargetBelow?.hasNonWhitespaceContent) {
-				return comment.targetRanges.push(createSingleLineRange(potentialTargetBelow.lineIndex))
+			// It has a relative target range, so select the number of non-annotation lines
+			// in the given direction, starting with the comment line
+			const step = relativeTargetRange > 0 ? 1 : -1
+			let lineIndex = commentLineIndex
+			let remainingLines = Math.abs(relativeTargetRange)
+			while (lineIndex >= 0 && lineIndex < codeLines.length && remainingLines > 0) {
+				// Check if the line is a valid target
+				const lineContents = getNonAnnotationCommentLineContents(lineIndex, options)
+				if (lineContents.contentRanges.length) {
+					targetRanges.push(createSingleLineRange(lineIndex))
+					remainingLines--
+				}
+				lineIndex += step
 			}
-			// Finally, scan for a target line above
-			const potentialTargetAbove = getFirstNonAnnotationCommentLineContents(annotationLineIndex, 'above', options)
-			if (potentialTargetAbove?.hasNonWhitespaceContent) {
-				return comment.targetRanges.push(createSingleLineRange(potentialTargetAbove.lineIndex))
-			}
-			// If we arrive here, there is no target range (same as the relative range `:0`),
-			// so don't do anything
-			return
 		}
 
 		// If a target search query is present, perform the search to determine the target range(s)
-		if (comment.tag.targetSearchQuery) {
+		if (targetSearchQuery) {
 			// Read the direction and number of matches to find from the tag,
 			// or auto-detect this in case no relative target range was given
-			let relativeTargetRange = comment.tag.relativeTargetRange
 			if (relativeTargetRange === undefined) {
-				if (annotationLineContents.hasNonWhitespaceContent) {
+				if (commentLineContents.hasNonWhitespaceContent) {
 					// The annotation comment is on the same line as content, so the direction
-					// depends on where the content is in relation to the comment
-					const hasContentBeforeAnnotation = annotationLineContents.nonWhitespaceContentRanges.some(
-						(contentRange) => compareRanges(comment.annotationRange, contentRange, 'start') < 0
+					// depends on where the content is in relation to the annotation
+					const hasContentBeforeAnnotation = commentLineContents.nonWhitespaceContentRanges.some(
+						// Check for non-whitespace content that starts before the annotation
+						(contentRange) => compareRanges(annotationRange, contentRange, 'start') < 0
 					)
 					relativeTargetRange = hasContentBeforeAnnotation ? -1 : 1
 				} else {
@@ -54,26 +79,33 @@ export function findAnnotationTargets(options: FindAnnotationTargetsOptions) {
 					// is visually grouped with content above it (= there no content directly below
 					// the annotation comment(s), but there is content directly above)
 					const isGroupedWithContentAbove =
-						!getFirstNonAnnotationCommentLineContents(annotationLineIndex, 'below', options)?.hasNonWhitespaceContent &&
-						getFirstNonAnnotationCommentLineContents(annotationLineIndex, 'above', options)?.hasNonWhitespaceContent
+						!getFirstNonAnnotationCommentLineContents(commentLineIndex, 'below', options)?.hasNonWhitespaceContent &&
+						getFirstNonAnnotationCommentLineContents(commentLineIndex, 'above', options)?.hasNonWhitespaceContent
 					relativeTargetRange = isGroupedWithContentAbove ? -1 : 1
 				}
 			}
 
-			// - Perform the search:
-			//   - The target search query can be a simple string, a single-quoted string, a double-quoted
-			//     string, or a regular expression. Regular expressions can optionally contain capture groups,
-			//     which will then be used to determine the target range(s) instead of the full match.
-			//   - The search is performed line by line, starting at the start or end of the annotation comment
-			//     and going in the direction determined by the relative target range that was either given or
-			//     automatically determined as described above.
-			//   - Before searching a line for matches, all characters that lie within the `outerRange` of any
-			//     annotation comment are removed from the line. If matches are found, the matched ranges are
-			//     adjusted to include the removed characters.
-			//   - Each match is added to the `targetRanges` until the number of matches equals the absolute
-			//     value of the relative target range, or the end of the code is reached.
-			//   - In the case of regular expressions with capture groups, a single match can result in multiple
-			//     target ranges, one for each capture group.
+			// Perform the search
+			const step = relativeTargetRange > 0 ? 1 : -1
+			let lineIndex = commentLineIndex
+			let remainingMatches = Math.abs(relativeTargetRange)
+			while (lineIndex >= 0 && lineIndex < codeLines.length && remainingMatches > 0) {
+				// Search all ranges of the line that are not part of an annotation comment
+				// for matches of the target search query
+				const lineContents = getNonAnnotationCommentLineContents(lineIndex, options)
+				const matches = lineContents.contentRanges.flatMap((contentRange) => findSearchQueryMatchesInLine(targetSearchQuery, contentRange, options))
+				if (matches.length) {
+					// Go through the matches in the direction of the relative target range
+					// until we have found the required number of matches
+					let matchIndex = relativeTargetRange > 0 ? 0 : matches.length - 1
+					while (matchIndex >= 0 && matchIndex < matches.length && remainingMatches > 0) {
+						targetRanges.push(matches[matchIndex])
+						remainingMatches--
+						matchIndex += step
+					}
+				}
+				lineIndex += step
+			}
 		}
 	})
 }
@@ -144,4 +176,66 @@ function getFirstNonAnnotationCommentLineContents(startLineIndex: number, search
 		if (contents.contentRanges.length) return contents
 		lineIndex += step
 	}
+}
+
+/**
+ * Searches the given column range on a single line for matches of the given search query,
+ * and returns an array of source ranges that represent the matches.
+ */
+function findSearchQueryMatchesInLine(searchQuery: string | RegExp, rangeToSearch: SourceRange, options: FindAnnotationTargetsOptions) {
+	const { codeLines } = options
+	const lineIndex = rangeToSearch.start.line
+	const startColumn = rangeToSearch.start.column ?? 0
+	const content = codeLines[lineIndex].slice(startColumn, rangeToSearch.end.column)
+
+	const ranges: SourceRange[] = []
+
+	// Handle plaintext string search terms
+	if (typeof searchQuery === 'string') {
+		let idx = content.indexOf(searchQuery, 0)
+		while (idx > -1) {
+			ranges.push(
+				createRange({
+					codeLines,
+					start: { line: lineIndex, column: startColumn + idx },
+					end: { line: lineIndex, column: startColumn + idx + searchQuery.length },
+				})
+			)
+			idx = content.indexOf(searchQuery, idx + searchQuery.length)
+		}
+	}
+
+	// Handle regular expression search terms
+	if (searchQuery instanceof RegExp) {
+		const matches = content.matchAll(searchQuery)
+		for (const match of matches) {
+			const rawGroupIndices = getGroupIndicesFromRegExpMatch(match)
+			// Remove null group indices
+			let groupIndices = rawGroupIndices.flatMap((range) => (range ? [range] : []))
+			// If there are no non-null indices, use the full match instead
+			// (capture group feature fallback, impossible to cover in tests)
+			/* c8 ignore start */
+			if (!groupIndices.length) {
+				groupIndices = [[match.index, match.index + match[0].length]]
+			}
+			/* c8 ignore end */
+			// If there are multiple non-null indices, remove the first one
+			// as it is the full match and we only want to mark capture groups
+			if (groupIndices.length > 1) {
+				groupIndices.shift()
+			}
+			// Create marked ranges from all remaining group indices
+			groupIndices.forEach((range) => {
+				ranges.push(
+					createRange({
+						codeLines,
+						start: { line: lineIndex, column: startColumn + range[0] },
+						end: { line: lineIndex, column: startColumn + range[1] },
+					})
+				)
+			})
+		}
+	}
+
+	return ranges
 }

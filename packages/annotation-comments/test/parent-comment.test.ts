@@ -2,43 +2,41 @@ import { describe, expect, test } from 'vitest'
 import type { AnnotationComment, SourceRange } from '../src/core/types'
 import { parseAnnotationTags } from '../src/parsers/annotation-tags'
 import { parseParentComment } from '../src/parsers/parent-comment'
-import { splitCodeLines } from './utils'
+import { splitCodeLines, validateAnnotationComment } from './utils'
 
 describe('parseParentComment()', () => {
 	describe('Returns undefined when no valid parent comment is found', () => {
 		describe('Single-line comment syntax', () => {
 			test('No comment syntax in the same line', () => {
-				expect(getParentComment(`console.log('This is [!ins] in a string')`)).toEqual(undefined)
+				expect(getParentComment([`console.log('This is [!ins] in a string'])`])).toEqual(undefined)
 			})
 			test('Comment syntax located after the annotation tag', () => {
-				expect(getParentComment(`console.log('More [!test] text') // Hi!`)).toEqual(undefined)
+				expect(getParentComment([`console.log('More [!test] text') // Hi!]`])).toEqual(undefined)
 			})
 			test('Missing whitespace before comment opening syntax', () => {
-				expect(getParentComment(`someCode()// [!note] Invalid syntax`)).toEqual(undefined)
+				expect(getParentComment([`someCode()// [!note] Invalid syntax`])).toEqual(undefined)
 			})
 			test('Missing whitespace before annotation tag', () => {
-				expect(getParentComment(`someCode() //[!note] Invalid syntax`)).toEqual(undefined)
+				expect(getParentComment([`someCode() //[!note] Invalid syntax`])).toEqual(undefined)
 			})
 			test('Content between comment opening and annotation tag', () => {
-				expect(getParentComment(`someCode() // Hi [!note] This will not work`)).toEqual(undefined)
+				expect(getParentComment([`someCode() // Hi [!note] This will not work`])).toEqual(undefined)
 			})
 		})
 		describe('Multi-line comment syntax', () => {
 			test('Content between the opening syntax and the annotation tag', () => {
-				expect(getParentComment(`/* Hi [!note] This will not work */`)).toEqual(undefined)
-				expect(getParentComment(`someCode() /* Hi [!note] This will not work */`)).toEqual(undefined)
+				expect(getParentComment([`/* Hi [!note] This will not work */`])).toEqual(undefined)
+				expect(getParentComment([`someCode() /* Hi [!note] This will not work */`])).toEqual(undefined)
 			})
 			test('Content between the beginning of the line and the annotation tag', () => {
 				expect(
-					getParentComment(
-						[
-							'someCode()',
-							'/*',
-							// Content before the annotation tag
-							'Hi [!note] This will not work',
-							'*/',
-						].join('\n')
-					)
+					getParentComment([
+						'someCode()',
+						'/*',
+						// Content before the annotation tag
+						'Hi [!note] This will not work',
+						'*/',
+					])
 				).toEqual(undefined)
 			})
 		})
@@ -616,7 +614,6 @@ describe('parseParentComment()', () => {
 					validateParentComment({
 						lines,
 						contents: ['Look, a note!'],
-						// Expect the space between the code and the comment to be included
 						commentRange: { start: { line: 4 }, end: { line: 4 } },
 					})
 				})
@@ -636,7 +633,6 @@ describe('parseParentComment()', () => {
 					validateParentComment({
 						lines,
 						contents: ['Look, a note!'],
-						// Expect the space between the code and the comment to be included
 						commentRange: { start: { line: 4 }, end: { line: 6 } },
 					})
 				})
@@ -716,8 +712,7 @@ console.log('Done!')
 		`
 	}
 
-	function getParentComment(code: string) {
-		const codeLines = splitCodeLines(code)
+	function getParentComment(codeLines: string[]) {
 		const annotationTags = parseAnnotationTags({ codeLines })
 		expect(annotationTags.length, 'No annotation tag was found in test code').toBeGreaterThanOrEqual(1)
 		const tag = annotationTags[0]
@@ -725,21 +720,9 @@ console.log('Done!')
 	}
 
 	function validateParentComment(options: { lines: string[]; contents: string[]; commentRange: SourceRange; annotationRange?: SourceRange | undefined }) {
-		const comment = getParentComment(getTestCode(options.lines.join('\n'))) as AnnotationComment
-		expect(comment.contents).toEqual(options.contents)
-		expect(comment.commentRange).toEqual(options.commentRange)
-		expect(comment.annotationRange).toEqual(options.annotationRange ?? options.commentRange)
+		const codeLines = splitCodeLines(getTestCode(options.lines.join('\n')))
+		const comment = getParentComment(codeLines) as AnnotationComment
 
-		const contentToSourceRange = (content: string) => {
-			for (let lineIndex = 0; lineIndex < options.lines.length; lineIndex++) {
-				const column = options.lines[lineIndex].indexOf(content)
-				if (column === -1) continue
-				const range: SourceRange = { start: { line: lineIndex + 2 }, end: { line: lineIndex + 2 } }
-				if (column > 0) range.start.column = column
-				if (column + content.length < options.lines[lineIndex].length) range.end.column = column + content.length
-				return range
-			}
-		}
-		expect(comment.contentRanges).toEqual(options.contents.map(contentToSourceRange))
+		validateAnnotationComment(comment, codeLines, options)
 	}
 })

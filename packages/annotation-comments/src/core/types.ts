@@ -6,8 +6,7 @@ export type AnnotationComment = {
 	 * including the comment's opening and closing syntax.
 	 *
 	 * Note that multi-line comments can contain multiple annotations and non-annotation content.
-	 * In such cases, {@link AnnotationComment.commentRange} is larger than
-	 * {@link AnnotationComment.annotationRange}.
+	 * In such cases, the comment range is larger than {@link AnnotationComment.annotationRange}.
 	 */
 	commentRange: SourceRange
 	/**

@@ -2,6 +2,7 @@ import type { AnnotationComment, SourceRange } from './types'
 import { parseAnnotationTags } from '../parsers/annotation-tags'
 import { parseParentComment } from '../parsers/parent-comment'
 import { secondRangeIsInFirst } from '../internal/ranges'
+import { findAnnotationTargets } from './find-targets'
 
 export type ParseAnnotationCommentsOptions = {
 	codeLines: string[]
@@ -57,7 +58,8 @@ export function parseAnnotationComments(options: ParseAnnotationCommentsOptions)
 		previousContentRanges = comment.contentRanges
 	})
 
-	// TODO: Call findAnnotationTargets() here
+	// Find the target ranges for all annotations
+	findAnnotationTargets({ codeLines, annotationComments })
 
 	return annotationComments
 }

@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import type { AnnotationComment, AnnotationTag } from '../src/core/types'
 import { parseAnnotationComments } from '../src/core/parse'
-import { splitCodeLines } from './utils'
-
-type PartialAnnotationComment = Partial<Omit<AnnotationComment, 'tag'>> & { tag: Partial<AnnotationTag> }
+import { createSingleLineRange } from '../src/internal/ranges'
+import { createGlobalRegExp } from '../src/internal/regexps'
+import type { ExpectedAnnotationComment } from './utils'
+import { splitCodeLines, validateAnnotationComment } from './utils'
 
 describe('parseAnnotationComments()', () => {
 	describe('Successfully parses code examples in various languages', () => {
@@ -40,9 +40,7 @@ export default defineConfig({
   }
 });
 			`.trim()
-			const comments = getComments(jsTestCode)
-			expect(comments).toHaveLength(5)
-			expect(comments).toMatchObject([
+			validateParsedComments(jsTestCode, [
 				{
 					tag: { name: 'note', targetSearchQuery: 'test' },
 					contents: [
@@ -54,24 +52,29 @@ export default defineConfig({
 					],
 					commentRange: { start: { line: 2 }, end: { line: 10 } },
 					annotationRange: { start: { line: 5 }, end: { line: 9 } },
+					targetRanges: [{ start: { line: 11, column: 22 }, end: { line: 11, column: 26 } }],
 				},
 				{
-					tag: { name: 'ins', targetSearchQuery: undefined },
+					tag: { name: 'ins' },
 					contents: [],
+					targetRanges: [createSingleLineRange(19)],
 				},
 				{
 					tag: { name: 'note', targetSearchQuery: "'some.example'" },
 					contents: [`This setting does not actually exist.`],
+					targetRanges: [{ start: { line: 25, column: 4 }, end: { line: 25, column: 18 } }],
 				},
 				{
-					tag: { name: 'ins', targetSearchQuery: undefined },
+					tag: { name: 'ins' },
 					contents: [],
+					targetRanges: [createSingleLineRange(26)],
 				},
 				{
-					tag: { name: 'ins', targetSearchQuery: undefined },
+					tag: { name: 'ins' },
 					contents: [],
+					targetRanges: [createSingleLineRange(27)],
 				},
-			] as PartialAnnotationComment[])
+			])
 		})
 
 		test('CSS', () => {
@@ -93,16 +96,16 @@ export default defineConfig({
   }
 }
 			`.trim()
-			const comments = getComments(cssTestCode)
-			expect(comments).toHaveLength(3)
-			expect(comments).toMatchObject([
+			validateParsedComments(cssTestCode, [
 				{
-					tag: { name: 'ins', targetSearchQuery: undefined },
+					tag: { name: 'ins' },
 					contents: [],
+					targetRanges: [createSingleLineRange(2)],
 				},
 				{
-					tag: { name: 'del', targetSearchQuery: undefined },
+					tag: { name: 'del' },
 					contents: [],
+					targetRanges: [createSingleLineRange(3)],
 				},
 				{
 					tag: { name: 'note', targetSearchQuery: 'linear-gradient' },
@@ -113,8 +116,9 @@ export default defineConfig({
 					],
 					commentRange: { start: { line: 6 }, end: { line: 8 } },
 					annotationRange: { start: { line: 6 }, end: { line: 8 } },
+					targetRanges: [{ start: { line: 9, column: 16 }, end: { line: 9, column: 31 } }],
 				},
-			] as PartialAnnotationComment[])
+			])
 		})
 
 		test('Astro', () => {
@@ -124,7 +128,7 @@ import Header from './Header.astro';
 import Logo from './Logo.astro';
 import Footer from './Footer.astro';
 
-// [!note:title] By destructuring the \`Astro.props\` object,
+// [!note:/\\{ ?(title) ?\\}/:2] By destructuring the \`Astro.props\` object,
 // we can access the \`title\` prop passed to this component.
 const { title } = Astro.props
 ---
@@ -139,11 +143,9 @@ const { title } = Astro.props
   <Footer />
 </div>
 			`.trim()
-			const comments = getComments(astroTestCode)
-			expect(comments).toHaveLength(3)
-			expect(comments).toMatchObject([
+			validateParsedComments(astroTestCode, [
 				{
-					tag: { name: 'note', targetSearchQuery: 'title' },
+					tag: { name: 'note', targetSearchQuery: createGlobalRegExp(/\{ ?(title) ?\}/), relativeTargetRange: 2 },
 					contents: [
 						// Content lines
 						`By destructuring the \`Astro.props\` object,`,
@@ -151,6 +153,11 @@ const { title } = Astro.props
 					],
 					commentRange: { start: { line: 5 }, end: { line: 6 } },
 					annotationRange: { start: { line: 5 }, end: { line: 6 } },
+					targetRanges: [
+						// Expect only the capture group inside the full match to be highlighted
+						{ start: { line: 7, column: 8 }, end: { line: 7, column: 13 } },
+						{ start: { line: 15, column: 7 }, end: { line: 15, column: 12 } },
+					],
 				},
 				{
 					tag: { name: 'note', targetSearchQuery: '{title}' },
@@ -162,17 +169,17 @@ const { title } = Astro.props
 					],
 				},
 				{
-					tag: { name: 'note', targetSearchQuery: undefined },
+					tag: { name: 'note' },
 					contents: [`Children passed to the component will be inserted here`],
 				},
-			] as PartialAnnotationComment[])
+			])
 		})
 
 		test('Python', () => {
 			const pythonTestCode = `
 import time
 
-# [!note] This function will print a countdown from the given time,
+# [!note:countdown:2] Prints a countdown from the given time,
 # as explained by this # [!note] annotation.
 def countdown(time_sec):
   while time_sec:
@@ -180,26 +187,31 @@ def countdown(time_sec):
     timeformat = '{:02d}:{:02d}'.format(mins, secs)
     print(timeformat, end='\\r')
     time.sleep(1)
-    time_sec -= 1 # [!note] This is important to actually count down
+    time_sec -= 1
+	# [!note:-1] This is important to actually count down
   print("stop")
 
 countdown(5)
 			`.trim()
-			const comments = getComments(pythonTestCode)
-			expect(comments).toMatchObject([
+			validateParsedComments(pythonTestCode, [
 				{
-					tag: { name: 'note', targetSearchQuery: undefined },
+					tag: { name: 'note', targetSearchQuery: 'countdown', relativeTargetRange: 2 },
 					contents: [
 						// Content lines
-						`This function will print a countdown from the given time,`,
+						`Prints a countdown from the given time,`,
 						`as explained by this # [!note] annotation.`,
+					],
+					targetRanges: [
+						{ start: { line: 4, column: 4 }, end: { line: 4, column: 13 } },
+						{ start: { line: 14 }, end: { line: 14, column: 9 } },
 					],
 				},
 				{
-					tag: { name: 'note', targetSearchQuery: undefined },
+					tag: { name: 'note', relativeTargetRange: -1 },
 					contents: [`This is important to actually count down`],
+					targetRanges: [{ start: { line: 10 }, end: { line: 10 } }],
 				},
-			] as PartialAnnotationComment[])
+			])
 		})
 	})
 
@@ -209,33 +221,35 @@ countdown(5)
 			`console.log('Inserted line with an attached note')`,
 			`testCode() // [!mark] // [!note] It also works at the end of a line.`,
 		]
-		const comments = getComments(lines.join('\n'))
-		expect(comments).toHaveLength(4)
-		expect(comments).toMatchObject([
+		validateParsedComments(lines, [
 			{
-				tag: { name: 'note', targetSearchQuery: undefined },
+				tag: { name: 'note' },
 				annotationRange: { start: { line: 0 }, end: { line: 0, column: lines[0].indexOf(' // [!ins]') } },
 				contents: [`This is the note content.`],
+				targetRanges: [createSingleLineRange(1)],
 			},
 			{
-				tag: { name: 'ins', targetSearchQuery: undefined },
+				tag: { name: 'ins' },
 				annotationRange: { start: { line: 0, column: lines[0].indexOf(' // [!ins]') }, end: { line: 0 } },
 				contents: [],
+				targetRanges: [createSingleLineRange(1)],
 			},
 			{
-				tag: { name: 'mark', targetSearchQuery: undefined },
+				tag: { name: 'mark' },
 				annotationRange: {
 					start: { line: 2, column: lines[2].indexOf(' // [!mark]') },
 					end: { line: 2, column: lines[2].indexOf(' // [!note]') },
 				},
 				contents: [],
+				targetRanges: [createSingleLineRange(2)],
 			},
 			{
-				tag: { name: 'note', targetSearchQuery: undefined },
+				tag: { name: 'note' },
 				annotationRange: { start: { line: 2, column: lines[2].indexOf(' // [!note]') }, end: { line: 2 } },
 				contents: [`It also works at the end of a line.`],
+				targetRanges: [createSingleLineRange(2)],
 			},
-		] as PartialAnnotationComment[])
+		])
 	})
 
 	describe('Supports ignoring unwanted annotations', () => {
@@ -247,18 +261,17 @@ countdown(5)
 				`testCode() // [!ignored] This should not be parsed`,
 				`// [!after] This should be parsed again`,
 			]
-			const comments = getComments(lines.join('\n'))
-			expect(comments).toMatchObject([
+			validateParsedComments(lines, [
 				{
-					tag: { name: 'before', targetSearchQuery: undefined },
+					tag: { name: 'before' },
 					contents: [`This is before any ignores`],
 				},
 				{ tag: { name: 'ignore-tags' } },
 				{
-					tag: { name: 'after', targetSearchQuery: undefined },
+					tag: { name: 'after' },
 					contents: [`This should be parsed again`],
 				},
-			] as PartialAnnotationComment[])
+			])
 		})
 		test('[!ignore-tags:2] ignores the next two lines', () => {
 			const lines = [
@@ -269,18 +282,17 @@ countdown(5)
 				`// [!ignored] Still ignored`,
 				`// [!after] This should be parsed again`,
 			]
-			const comments = getComments(lines.join('\n'))
-			expect(comments).toMatchObject([
+			validateParsedComments(lines, [
 				{
-					tag: { name: 'before', targetSearchQuery: undefined },
+					tag: { name: 'before' },
 					contents: [`This is before any ignores`],
 				},
-				{ tag: { name: 'ignore-tags' } },
+				{ tag: { name: 'ignore-tags', relativeTargetRange: 2 } },
 				{
-					tag: { name: 'after', targetSearchQuery: undefined },
+					tag: { name: 'after' },
 					contents: [`This should be parsed again`],
 				},
-			] as PartialAnnotationComment[])
+			])
 		})
 		test('[!ignore-tags:note] ignores the next occurrence of "note"', () => {
 			const lines = [
@@ -290,18 +302,17 @@ countdown(5)
 				`testCode() // [!note] This should not be parsed`,
 				`// [!note] This should be parsed again`,
 			]
-			const comments = getComments(lines.join('\n'))
-			expect(comments).toMatchObject([
+			validateParsedComments(lines, [
 				{
-					tag: { name: 'before', targetSearchQuery: undefined },
+					tag: { name: 'before' },
 					contents: [`This is before any ignores`],
 				},
-				{ tag: { name: 'ignore-tags' } },
+				{ tag: { name: 'ignore-tags', targetSearchQuery: 'note' } },
 				{
-					tag: { name: 'note', targetSearchQuery: undefined },
+					tag: { name: 'note' },
 					contents: [`This should be parsed again`],
 				},
-			] as PartialAnnotationComment[])
+			])
 		})
 		test('[!ignore-tags:note,ins:3] ignores the next 3 occurrences of "note" and "ins"', () => {
 			const lines = [
@@ -314,22 +325,21 @@ countdown(5)
 				`console.log('Test') // [!ins]`,
 				`// [!note] This should be parsed again`,
 			]
-			const comments = getComments(lines.join('\n'))
-			expect(comments).toMatchObject([
+			validateParsedComments(lines, [
 				{
-					tag: { name: 'before', targetSearchQuery: undefined },
+					tag: { name: 'before' },
 					contents: [`This is before any ignores`],
 				},
-				{ tag: { name: 'ignore-tags' } },
+				{ tag: { name: 'ignore-tags', targetSearchQuery: 'note,ins', relativeTargetRange: 3 } },
 				{
-					tag: { name: 'ins', targetSearchQuery: undefined },
+					tag: { name: 'ins' },
 					contents: [],
 				},
 				{
-					tag: { name: 'note', targetSearchQuery: undefined },
+					tag: { name: 'note' },
 					contents: [`This should be parsed again`],
 				},
-			] as PartialAnnotationComment[])
+			])
 		})
 		test('Ignores work in multi-line comments', () => {
 			const lines = [
@@ -342,31 +352,34 @@ countdown(5)
 				`console.log('Some code')`,
 				`testCode() // [!ins]`,
 			]
-			const comments = getComments(lines.join('\n'))
-			expect(comments).toMatchObject([
+			validateParsedComments(lines, [
 				{
-					tag: { name: 'before', targetSearchQuery: undefined },
+					tag: { name: 'before' },
 					contents: [`This is before any ignores`],
 					commentRange: { start: { line: 0 }, end: { line: 5 } },
 					annotationRange: { start: { line: 1 }, end: { line: 1 } },
 				},
 				{ tag: { name: 'ignore-tags' } },
 				{
-					tag: { name: 'note', targetSearchQuery: undefined },
+					tag: { name: 'note' },
 					contents: [`This should be parsed again`],
 					commentRange: { start: { line: 0 }, end: { line: 5 } },
 					annotationRange: { start: { line: 4 }, end: { line: 4 } },
 				},
 				{
-					tag: { name: 'ins', targetSearchQuery: undefined },
+					tag: { name: 'ins' },
 					contents: [],
 				},
-			] as PartialAnnotationComment[])
+			])
 		})
 	})
 
-	function getComments(code: string) {
-		const codeLines = splitCodeLines(code)
-		return parseAnnotationComments({ codeLines })
+	function validateParsedComments(code: string | string[], expectedComments: ExpectedAnnotationComment[]) {
+		const codeLines = Array.isArray(code) ? code : splitCodeLines(code)
+		const actualComments = parseAnnotationComments({ codeLines })
+		expectedComments.forEach((expectedComment, index) => {
+			validateAnnotationComment(actualComments[index], codeLines, expectedComment)
+		})
+		expect(actualComments).toHaveLength(expectedComments.length)
 	}
 })
