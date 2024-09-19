@@ -678,8 +678,6 @@ describe('parseParentComment()', () => {
 					validateParentComment({
 						lines,
 						contents: ['Annotation content'],
-						// Expect the closing syntax not to be included in the comment range
-						// as the comment also contains non-annotation content
 						commentRange: { start: { line: 2 }, end: { line: 2 } },
 					})
 				})
@@ -695,8 +693,6 @@ describe('parseParentComment()', () => {
 					validateParentComment({
 						lines,
 						contents: ['Annotation content', 'that spans multiple lines'],
-						// Expect the closing syntax not to be included in the comment range
-						// as the comment also contains non-annotation content
 						commentRange: { start: { line: 2 }, end: { line: 5 } },
 					})
 				})

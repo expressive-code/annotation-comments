@@ -3,7 +3,7 @@ import type { SourceLocation, SourceRange } from '../core/types'
 /**
  * Creates a new source range object from the given start and end locations.
  */
-export function createRange(options: { codeLines: string[]; start: SourceLocation; end: SourceLocation }) {
+export function createRange(options: { codeLines: string[]; start: SourceLocation; end: SourceLocation }): SourceRange {
 	const { codeLines, start, end } = options
 	const range: SourceRange = {
 		start: { line: start.line },
@@ -12,6 +12,10 @@ export function createRange(options: { codeLines: string[]; start: SourceLocatio
 	if (start.column ?? 0 > 0) range.start.column = start.column
 	if (end.column && end.column < (codeLines[end.line] ?? '').length) range.end.column = end.column
 	return range
+}
+
+export function createSingleLineRange(lineIndex: number): SourceRange {
+	return { start: { line: lineIndex }, end: { line: lineIndex } }
 }
 
 /**
