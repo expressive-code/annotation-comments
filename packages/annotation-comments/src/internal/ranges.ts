@@ -18,6 +18,10 @@ export function createSingleLineRange(lineIndex: number): SourceRange {
 	return { start: { line: lineIndex }, end: { line: lineIndex } }
 }
 
+export function createSingleLineRanges(...lineIndices: number[]): SourceRange[] {
+	return lineIndices.map((lineIndex) => ({ start: { line: lineIndex }, end: { line: lineIndex } }))
+}
+
 /**
  * Compares two source ranges by their start or end locations.
  *

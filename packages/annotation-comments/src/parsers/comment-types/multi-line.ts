@@ -2,7 +2,7 @@ import type { AnnotationComment, AnnotationTag, SourceRange } from '../../core/t
 import type { ParseParentCommentOptions } from '../parent-comment'
 import { escapeRegExp } from '../../internal/escaping'
 import { compareRanges, createRange } from '../../internal/ranges'
-import { getTextContentInLine } from '../text-content'
+import { getTextContentInLine } from '../../internal/text-content'
 
 type MultiLineCommentSyntax = {
 	opening: string

@@ -1,8 +1,6 @@
-import type { AnnotationComment } from './types'
+import type { AnnotatedCode, AnnotationComment } from './types'
 
-export type CleanCodeOptions = {
-	codeLines: string[]
-	annotationComments: AnnotationComment[]
+export type CleanCodeOptions = AnnotatedCode & {
 	removeAnnotationContents?: boolean | ((context: RemoveAnnotationContentsContext) => boolean)
 	updateTargetRanges?: boolean
 	handleRemoveLine?: (context: HandleRemoveLineContext) => boolean

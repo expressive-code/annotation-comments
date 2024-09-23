@@ -54,3 +54,40 @@ export function getGroupIndicesFromRegExpMatch(match: RegExpMatchArray) {
 
 	return groupIndices
 }
+
+/**
+ * Searches the given content for matches of the given regular expression,
+ * and returns the column ranges of all matches.
+ *
+ * If the regular expression contains capture groups, it will use the column ranges
+ * of the matched capture groups instead of the full match ranges.
+ */
+export function findRegExpMatchColumnRanges(content: string, regExp: RegExp) {
+	const columnRanges: { start: number; end: number }[] = []
+	const matches = content.matchAll(regExp)
+	for (const match of matches) {
+		const rawGroupIndices = getGroupIndicesFromRegExpMatch(match)
+		// Remove null group indices
+		let groupIndices = rawGroupIndices.flatMap((range) => (range ? [range] : []))
+		// If there are no non-null indices, use the full match instead
+		// (capture group feature fallback, impossible to cover in tests)
+		/* c8 ignore start */
+		if (!groupIndices.length) {
+			groupIndices = [[match.index, match.index + match[0].length]]
+		}
+		/* c8 ignore end */
+		// If there are multiple non-null indices, remove the first one
+		// as it is the full match and we only want to mark capture groups
+		if (groupIndices.length > 1) {
+			groupIndices.shift()
+		}
+		// Create marked ranges from all remaining group indices
+		groupIndices.forEach((range) => {
+			columnRanges.push({
+				start: range[0],
+				end: range[1],
+			})
+		})
+	}
+	return columnRanges
+}

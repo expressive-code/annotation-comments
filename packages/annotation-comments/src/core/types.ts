@@ -85,3 +85,8 @@ export type SourceRange = {
 	/** The end (line & optional column) of the range. */
 	end: SourceLocation
 }
+
+export type AnnotatedCode = {
+	codeLines: string[]
+	annotationComments: AnnotationComment[]
+}

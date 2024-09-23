@@ -1,7 +1,7 @@
 import type { AnnotationComment, SourceRange } from '../../core/types'
 import type { ParseParentCommentOptions } from '../parent-comment'
 import { escapeRegExp } from '../../internal/escaping'
-import { getTextContentInLine } from '../text-content'
+import { getTextContentInLine } from '../../internal/text-content'
 import { createRange } from '../../internal/ranges'
 
 const singleLineCommentSyntaxes: string[] = [
