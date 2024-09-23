@@ -23,7 +23,7 @@ export type HandleEditLineContext = {
 	codeLines: string[]
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function cleanCode(options: CleanCodeOptions) {
-	const { annotationComments, codeLines, updateTargetRanges, handleRemoveLine, handleEditLine: handleRemoveInlineRange } = options
 	// TODO: Implement cleanCode()
 }

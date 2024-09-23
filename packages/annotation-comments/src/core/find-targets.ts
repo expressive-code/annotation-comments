@@ -6,7 +6,7 @@ export function findAnnotationTargets(annotatedCode: AnnotatedCode) {
 	const { codeLines, annotationComments } = annotatedCode
 
 	annotationComments.forEach((comment) => {
-		const { tag, commentRange, annotationRange, targetRanges } = comment
+		const { tag, commentRange, targetRanges } = comment
 
 		// We don't need to search for `ignore-tags` annotation targets
 		// as ignores are handled by the annotation comment parser
