@@ -41,7 +41,7 @@ console.log('Some code');
 
 const codeLines = code.trim().split(/\r?\n/);
 
-const annotationComments = parseAnnotationComments({ codeLines });
+const { annotationComments, errorMessages } = parseAnnotationComments({ codeLines });
 
 cleanCode({ annotationComments, codeLines });
 ```
@@ -62,9 +62,14 @@ type ParseAnnotationCommentsOptions = {
 }
 ```
 
-Its return value is an array of `AnnotationComment` objects:
+Its return value is an object that contains both all parsed annotation comments and any error messages that occurred during parsing:
 
 ```ts
+export type ParseAnnotationCommentsResult = {
+  annotationComments: AnnotationComment[]
+  errorMessages: string[]
+}
+
 type AnnotationComment = {
   tag: AnnotationTag
   contents: string[]
@@ -94,6 +99,9 @@ export type SourceLocation = {
 ```
 
 ### cleanCode()
+
+> **Warning**
+> This function is not implemented yet.
 
 This function prepares annotated code lines for display or copying to the clipboard by making it look like regular (non-annotated) code again.
 

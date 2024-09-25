@@ -189,14 +189,16 @@ describe('parseParentComment()', () => {
 					'// [!note] Annotation content',
 					// ...but continues on the next lines by repeating the comment opening syntax
 					'// that spans multiple lines',
+					// ...and can contain empty lines
+					'//',
 					'// until the comment ends',
 					// ...and ends when the comment syntax is not repeated
 					'someCode()',
 				]
 				validateParentComment({
 					lines,
-					contents: ['Annotation content', 'that spans multiple lines', 'until the comment ends'],
-					commentRange: { start: { line: 2 }, end: { line: 4 } },
+					contents: ['Annotation content', 'that spans multiple lines', '', 'until the comment ends'],
+					commentRange: { start: { line: 2 }, end: { line: 5 } },
 				})
 			})
 			test('Multi-line content ends when encountering a different comment syntax', () => {
@@ -460,6 +462,25 @@ describe('parseParentComment()', () => {
 					commentRange: { start: { line: 2 }, end: { line: 6 } },
 				})
 			})
+			test('Removes whitespace-only lines from the beginning and end of the content', () => {
+				const lines = [
+					'/*',
+					// Some empty lines
+					'',
+					'  [!note] Annotation content',
+					'  that spans multiple lines',
+					'  until the comment ends',
+					'',
+					'',
+					'*/',
+					'someCode()',
+				]
+				validateParentComment({
+					lines,
+					contents: ['Annotation content', 'that spans multiple lines', 'until the comment ends'],
+					commentRange: { start: { line: 2 }, end: { line: 9 } },
+				})
+			})
 		})
 		describe('Handles special syntax requirements', () => {
 			test('Excludes JSDoc continuation line syntax "*" from annotation content', () => {
@@ -713,8 +734,9 @@ console.log('Done!')
 	}
 
 	function getParentComment(codeLines: string[]) {
-		const annotationTags = parseAnnotationTags({ codeLines })
+		const { annotationTags, errorMessages } = parseAnnotationTags({ codeLines })
 		expect(annotationTags.length, 'No annotation tag was found in test code').toBeGreaterThanOrEqual(1)
+		expect(errorMessages, 'Unexpected error parsing annotation tags').toEqual([])
 		const tag = annotationTags[0]
 		return parseParentComment({ codeLines, tag })
 	}

@@ -6,6 +6,23 @@ import type { ExpectedAnnotationComment } from './utils'
 import { splitCodeLines, validateAnnotationComment } from './utils'
 
 describe('parseAnnotationComments()', () => {
+	describe('Handles potential errors gracefully', () => {
+		test('Ignores annotation tags lacking a parent comment', () => {
+			validateParsedComments(
+				[
+					`/*`,
+					`This is a multi-line comment without any annotations.`,
+					`*/`,
+					// Note the missing comment syntax here
+					`[!note] This note has no parent comment`,
+					// Also no comment syntax here
+					`console.log('Some code including the string [!tag] on its own')`,
+				],
+				[]
+			)
+		})
+	})
+
 	describe('Successfully parses code examples in various languages', () => {
 		test('JavaScript (including JSDoc)', () => {
 			const jsTestCode = `
@@ -369,6 +386,99 @@ countdown(9) // This one is out of the target range
 					contents: [],
 				},
 			])
+		})
+		test('[!ignore-tags:-3] is ignored because of its negative range', () => {
+			const lines = [
+				`// [!before] This is before any ignores`,
+				`// [!ignore-tags:-3]`,
+				`console.log('Some code') // [!ins1]`,
+				`// [!ins2]`,
+				`testCode()`,
+				`// [!ignore-tags:-2]`,
+				`someMoreCode()`,
+				`console.log('Test') // [!ins3]`,
+				`/* [!ignore-tags:ins3:-1] */`,
+				`// [!note] A regular note`,
+			]
+			validateParsedComments(
+				lines,
+				[
+					{
+						tag: { name: 'before' },
+						contents: [`This is before any ignores`],
+					},
+					{ tag: { name: 'ignore-tags', relativeTargetRange: -3 } },
+					{
+						tag: { name: 'ins1' },
+						contents: [],
+					},
+					{
+						tag: { name: 'ins2' },
+						contents: [],
+					},
+					{ tag: { name: 'ignore-tags', relativeTargetRange: -2 } },
+					{
+						tag: { name: 'ins3' },
+						contents: [],
+					},
+					{ tag: { name: 'ignore-tags', targetSearchQuery: 'ins3', relativeTargetRange: -1 } },
+					{
+						tag: { name: 'note' },
+						contents: [`A regular note`],
+					},
+				],
+				[
+					// Expect each error message to contain a line number and a problem description
+					/line 2: .*target range must be.*positive/,
+					/line 6: .*target range must be.*positive/,
+					/line 9: .*target range must be.*positive/,
+				]
+			)
+		})
+		test('Does not ignore anything if [!ignore-tags] is not its own line', () => {
+			const lines = [
+				`// [!before] This is before any ignores`,
+				`console.log('Some code') // [!ignore-tags] // [!ins1]`,
+				`// [!ins2]`,
+				`testCode() // [!ignore-tags]`,
+				`/* [!ignore-tags:ins3] */ someMoreCode()`,
+				`console.log('Test') // [!ins3]`,
+				`// [!note] A regular note`,
+			]
+			validateParsedComments(
+				lines,
+				[
+					{
+						tag: { name: 'before' },
+						contents: [`This is before any ignores`],
+					},
+					{ tag: { name: 'ignore-tags' } },
+					{
+						tag: { name: 'ins1' },
+						contents: [],
+					},
+					{
+						tag: { name: 'ins2' },
+						contents: [],
+					},
+					{ tag: { name: 'ignore-tags' } },
+					{ tag: { name: 'ignore-tags', targetSearchQuery: 'ins3' } },
+					{
+						tag: { name: 'ins3' },
+						contents: [],
+					},
+					{
+						tag: { name: 'note' },
+						contents: [`A regular note`],
+					},
+				],
+				[
+					// Expect each error message to contain a line number and a problem description
+					/line 2: .*on its own line/,
+					/line 4: .*on its own line/,
+					/line 5: .*on its own line/,
+				]
+			)
 		})
 	})
 
@@ -1109,12 +1219,17 @@ countdown(9) // This one is out of the target range
 		})
 	})
 
-	function validateParsedComments(code: string | string[], expectedComments: ExpectedAnnotationComment[]) {
+	function validateParsedComments(code: string | string[], expectedComments: ExpectedAnnotationComment[], expectedErrors: RegExp[] = []) {
 		const codeLines = Array.isArray(code) ? code : splitCodeLines(code)
-		const actualComments = parseAnnotationComments({ codeLines })
+		const { annotationComments, errorMessages } = parseAnnotationComments({ codeLines })
+		const expectedTagNames = expectedComments.map(({ tag }) => tag?.name || 'no tag').join(', ')
+		const actualTagNames = annotationComments.map(({ tag }) => tag?.name || 'no tag').join(', ')
+		expect(actualTagNames, 'Unexpected tags').toBe(expectedTagNames)
 		expectedComments.forEach((expectedComment, index) => {
-			validateAnnotationComment(actualComments[index], codeLines, expectedComment)
+			validateAnnotationComment(annotationComments[index], codeLines, expectedComment)
 		})
-		expect(actualComments).toHaveLength(expectedComments.length)
+		expect(annotationComments).toHaveLength(expectedComments.length)
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+		expect(errorMessages).toEqual(expectedErrors.map((regExp) => expect.stringMatching(regExp)))
 	}
 })

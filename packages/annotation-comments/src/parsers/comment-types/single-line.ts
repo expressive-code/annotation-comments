@@ -120,7 +120,7 @@ export function parseSingleLineParentComment(options: ParseParentCommentOptions)
 					// and expand the comment range to cover the additional full line
 					const column = Math.min(possibleContentStart, line.length)
 					contents.push('')
-					contentRanges.push({ start: { line: lineIndex, column }, end: { line: lineIndex, column } })
+					contentRanges.push(createRange({ codeLines, start: { line: lineIndex, column }, end: { line: lineIndex } }))
 					commentRange.end = { line: lineIndex }
 				}
 			}

@@ -40,7 +40,7 @@ export function validateAnnotationComment(actual: AnnotationComment, codeLines: 
 			let column = -1
 			if (expectedContent.length) {
 				column = codeLine.indexOf(expectedContent)
-			} else if (!codeLine || codeLine.trim() === '*') {
+			} else if (!codeLine || codeLine.trim() === '*' || codeLine.trim() === '//') {
 				column = codeLine.length
 			}
 			if (column === -1) continue

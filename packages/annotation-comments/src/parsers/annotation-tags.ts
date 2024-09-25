@@ -1,9 +1,15 @@
 import { AnnotationTag } from '../core/types'
+import { coerceError } from '../internal/errors'
 import { getEscapeSequenceRegExp } from '../internal/escaping'
 import { createGlobalRegExp } from '../internal/regexps'
 
 export type ParseAnnotationTagsOptions = {
 	codeLines: string[]
+}
+
+export type ParseAnnotationTagsResult = {
+	annotationTags: AnnotationTag[]
+	errorMessages: string[]
 }
 
 const annotationTagRegex = new RegExp(
@@ -98,30 +104,40 @@ function parseTargetSearchQuery(rawTargetSearchQuery: string | undefined): strin
 	return unescapedQuery
 }
 
-export function parseAnnotationTags(options: ParseAnnotationTagsOptions): AnnotationTag[] {
+export function parseAnnotationTags(options: ParseAnnotationTagsOptions): ParseAnnotationTagsResult {
 	const { codeLines } = options
 	const annotationTags: AnnotationTag[] = []
+	const errorMessages: string[] = []
 
 	codeLines.forEach((line, lineIndex) => {
 		const matches = [...line.matchAll(annotationTagRegex)]
 		matches.forEach((match) => {
-			const [, name, rawTargetSearchQuery, relativeTargetRange] = match
-			const rawTag = match[0]
-			const startColIndex = match.index
-			const endColIndex = startColIndex + rawTag.length
-			const targetSearchQuery = parseTargetSearchQuery(rawTargetSearchQuery)
-			annotationTags.push({
-				name,
-				targetSearchQuery,
-				relativeTargetRange: relativeTargetRange !== undefined ? Number(relativeTargetRange) : undefined,
-				rawTag,
-				range: {
-					start: { line: lineIndex, column: startColIndex },
-					end: { line: lineIndex, column: endColIndex },
-				},
-			})
+			try {
+				const [, name, rawTargetSearchQuery, relativeTargetRange] = match
+				const rawTag = match[0]
+				const startColIndex = match.index
+				const endColIndex = startColIndex + rawTag.length
+
+				const targetSearchQuery = parseTargetSearchQuery(rawTargetSearchQuery)
+				annotationTags.push({
+					name,
+					targetSearchQuery,
+					relativeTargetRange: relativeTargetRange !== undefined ? Number(relativeTargetRange) : undefined,
+					rawTag,
+					range: {
+						start: { line: lineIndex, column: startColIndex },
+						end: { line: lineIndex, column: endColIndex },
+					},
+				})
+			} catch (error) {
+				const msg = coerceError(error).message
+				errorMessages.push(`Failed to parse annotation tag in line ${lineIndex + 1}: ${msg}`)
+			}
 		})
 	})
 
-	return annotationTags
+	return {
+		annotationTags,
+		errorMessages,
+	}
 }

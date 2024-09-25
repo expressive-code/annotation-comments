@@ -39,6 +39,7 @@ export function getGroupIndicesFromRegExpMatch(match: RegExpMatchArray) {
 	// Read the start and end ranges from the `indices` property,
 	// which is made available through the RegExp flag `d`
 	let groupIndices = match.indices as ([start: number, end: number] | null)[]
+	/* v8 ignore start */
 	if (groupIndices?.length) return groupIndices
 
 	// We could not access native group indices, so we need to use fallback logic
@@ -53,6 +54,7 @@ export function getGroupIndicesFromRegExpMatch(match: RegExpMatchArray) {
 	})
 
 	return groupIndices
+	/* v8 ignore end */
 }
 
 /**

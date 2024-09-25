@@ -6,16 +6,76 @@ import { splitCodeLines } from './utils'
 
 describe('parseAnnotationTags()', () => {
 	test('Returns an empty array when no annotation tags are found', () => {
-		expect(
-			getTags(`
-// This is a simple comment.
-console.log('Some code');
+		const codeLines = [
+			// Example code without an annotation tag
+			'// This is a simple comment.',
+			'console.log("Some code");',
+			'',
+			'/*',
+			'\t[TODO] Not an annotation tag.',
+			'*/',
+		]
+		const { annotationTags, errorMessages } = parseAnnotationTags({ codeLines })
 
-/*
-	[TODO] Not an annotation tag.
-*/
-			`)
-		).toEqual([])
+		expect(annotationTags).toEqual([])
+		expect(errorMessages).toEqual([])
+	})
+
+	describe('Returns error messages when invalid annotation tags are found', () => {
+		test('Single invalid regular expression', () => {
+			const codeLines = [
+				// The following regular expression should cause an error to be returned
+				'// [!note:/(this|group|is|unclosed/] Note the invalid regexp in the search query.',
+				'console.log("Some code");',
+			]
+			const { annotationTags, errorMessages } = parseAnnotationTags({ codeLines })
+
+			expect(annotationTags).toEqual([])
+			expect(errorMessages).toEqual([
+				// Expect the line number and regexp contents to be called out
+				expect.stringMatching(/line 1.*\(this\|group/),
+			])
+		})
+		test('Multiple invalid regular expressions', () => {
+			const codeLines = [
+				// The following regular expression should cause an error to be returned
+				'// [!note:/(this|group|is|unclosed/] Note the invalid regexp in the search query.',
+				'console.log("Some code");',
+				'// [!note:/te[st/] This regexp is also invalid.',
+				'console.log("Some more code");',
+			]
+			const { annotationTags, errorMessages } = parseAnnotationTags({ codeLines })
+
+			expect(annotationTags).toEqual([])
+			expect(errorMessages).toEqual([
+				// Expect both lines and regexp contents to be called out
+				expect.stringMatching(/line 1.*\(this\|group/),
+				expect.stringMatching(/line 3.*te\[st/),
+			])
+		})
+		test('Valid tags are still parsed even if invalid ones are also present', () => {
+			const codeLines = [
+				// The following regular expression should cause an error to be returned
+				'// [!note:/(this|group|is|unclosed/] Note the invalid regexp in the search query.',
+				'console.log("Some code"); // [!tag] This is a valid tag.',
+				'// [!note:/te[st/] This regexp is also invalid.',
+				'console.log("Some more code");',
+			]
+			const { annotationTags, errorMessages } = parseAnnotationTags({ codeLines })
+
+			expect(annotationTags).toEqual([
+				expect.objectContaining({
+					name: 'tag',
+					targetSearchQuery: undefined,
+					relativeTargetRange: undefined,
+				}),
+			])
+			expect(errorMessages).toEqual([
+				// Expect both lines and regexp contents to be called out
+				expect.stringMatching(/line 1.*\(this\|group/),
+				expect.stringMatching(/line 3.*te\[st/),
+			])
+		})
 	})
 
 	describe('Parses tag names', () => {
@@ -250,8 +310,8 @@ console.log('Some code'); // ${test.rawTag} Tag at the end of a line
 ${test.rawTag} Tag in a multi-line comment
 */
 		`)
-		// Build expected result by searching the raw tag in the code lines
-		const expected = codeLines.reduce((acc, line, lineIndex) => {
+		// Build array of expected tags by searching the raw tag in the code lines
+		const expectedAnnotationTags = codeLines.reduce((acc, line, lineIndex) => {
 			let startIndex = line.indexOf(test.rawTag)
 			while (startIndex !== -1) {
 				acc.push({
@@ -269,11 +329,8 @@ ${test.rawTag} Tag in a multi-line comment
 			return acc
 		}, [] as AnnotationTag[])
 		// Perform test
-		expect(parseAnnotationTags({ codeLines })).toEqual(expected)
-	}
-
-	function getTags(code: string) {
-		const codeLines = splitCodeLines(code)
-		return parseAnnotationTags({ codeLines })
+		const { annotationTags, errorMessages } = parseAnnotationTags({ codeLines })
+		expect(annotationTags).toEqual(expectedAnnotationTags)
+		expect(errorMessages).toEqual([])
 	}
 })

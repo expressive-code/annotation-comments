@@ -6,7 +6,11 @@
  */
 export function coerceError(error: unknown): { message: string; code?: string | undefined } {
 	if (typeof error === 'object' && error !== null && 'message' in error) {
+		/* c8 ignore start */
 		return error as { message: string; code?: string | undefined }
+		/* c8 ignore end */
 	}
+	/* c8 ignore start */
 	return { message: error as string }
+	/* c8 ignore end */
 }
