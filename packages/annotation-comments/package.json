@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "build": "tsup ./src/index.ts --format esm --no-splitting --dts --sourcemap --clean",
-    "coverage": "vitest run --coverage",
+    "coverage": "vitest run --coverage --coverage.include=src/**/*.ts --coverage.exclude=src/index.ts",
     "test": "vitest run --reporter verbose",
     "test-short": "vitest run --reporter basic",
     "test-watch": "vitest --reporter verbose",
