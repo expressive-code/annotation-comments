@@ -74,6 +74,7 @@ type AnnotationComment = {
   tag: AnnotationTag
   contents: string[]
   commentRange: SourceRange
+  commentInnerRange: SourceRange
   annotationRange: SourceRange
   contentRanges: SourceRange[]
   targetRanges: SourceRange[]
@@ -99,9 +100,6 @@ export type SourceLocation = {
 ```
 
 ### cleanCode()
-
-> **Warning**
-> This function is not implemented yet.
 
 This function prepares annotated code lines for display or copying to the clipboard by making it look like regular (non-annotated) code again.
 
@@ -132,6 +130,7 @@ type HandleEditLineContext = {
   lineIndex: number
   startColumn: number
   endColumn: number
+  newText?: string | undefined
   codeLines: string[]
 }
 ```

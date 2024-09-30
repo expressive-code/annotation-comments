@@ -10,6 +10,11 @@ export type AnnotationComment = {
 	 */
 	commentRange: SourceRange
 	/**
+	 * The inner range of the parent comment that contains the annotation,
+	 * excluding the comment's opening and closing syntax.
+	 */
+	commentInnerRange: SourceRange
+	/**
 	 * The outer range of the annotation, covering both the annotation tag and
 	 * any optional content.
 	 *

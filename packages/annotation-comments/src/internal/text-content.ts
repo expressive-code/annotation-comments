@@ -1,5 +1,5 @@
 import type { AnnotatedCode, SourceRange } from '../core/types'
-import { createRange } from './ranges'
+import { createRange, createSingleLineRange, excludeRangesFromOuterRange } from './ranges'
 import { findRegExpMatchColumnRanges } from './regexps'
 
 /**
@@ -44,41 +44,14 @@ export function getTextContentInLine(options: {
  */
 export function getNonAnnotationCommentLineContents(lineIndex: number, annotatedCode: AnnotatedCode) {
 	const { codeLines, annotationComments } = annotatedCode
-	const lineLength = codeLines[lineIndex].length
-	const contentRanges: SourceRange[] = [{ start: { line: lineIndex, column: 0 }, end: { line: lineIndex, column: lineLength } }]
 
-	annotationComments.forEach((comment) => {
-		const { commentRange } = comment
-		// Ignore the current comment if it's outside the current line
-		if (commentRange.start.line > lineIndex || commentRange.end.line < lineIndex) return
-		// Otherwise, go through all non-annotation ranges to remove, cut, or split them
-		// if they intersect with with the current comment
-		const commentStartColumn = commentRange.start.line === lineIndex ? (commentRange.start.column ?? 0) : 0
-		const commentEndColumn = commentRange.end.line === lineIndex ? (commentRange.end.column ?? lineLength) : lineLength
-		for (let i = contentRanges.length - 1; i >= 0; i--) {
-			const nonAnnotationRange = contentRanges[i]
-			const rangeStartColumn = nonAnnotationRange.start.column ?? 0
-			const rangeEndColumn = nonAnnotationRange.end.column ?? lineLength
-			if (commentStartColumn <= rangeStartColumn && commentEndColumn >= rangeEndColumn) {
-				// The comment completely covers the range, so remove it
-				contentRanges.splice(i, 1)
-			} else if (commentStartColumn <= rangeStartColumn && commentEndColumn < rangeEndColumn) {
-				// The comment overlaps with the start of the range, so adjust the range start
-				nonAnnotationRange.start.column = commentEndColumn
-			} else if (commentStartColumn > rangeStartColumn && commentEndColumn >= rangeEndColumn) {
-				// The comment overlaps with the end of the range, so adjust the range end
-				nonAnnotationRange.end.column = commentStartColumn
-			} else if (commentStartColumn > rangeStartColumn && commentEndColumn < rangeEndColumn) {
-				// The comment is inside the range, so split the range into two
-				// ...by making the current range end before the comment
-				nonAnnotationRange.end.column = commentStartColumn
-				// ...and inserting a new range that starts after the comment
-				contentRanges.splice(i + 1, 0, { start: { line: lineIndex, column: commentEndColumn }, end: { line: lineIndex, column: rangeEndColumn } })
-			}
-		}
+	const contentRanges = excludeRangesFromOuterRange({
+		codeLines,
+		outerRange: createSingleLineRange(lineIndex),
+		rangesToExclude: annotationComments.map((comment) => comment.commentRange),
 	})
 
-	const nonWhitespaceContentRanges = contentRanges.filter((range) => codeLines[lineIndex].slice(range.start.column, range.end.column).search(/\S/) > -1)
+	const nonWhitespaceContentRanges = excludeWhitespaceRanges(codeLines, contentRanges)
 
 	return {
 		lineIndex,
@@ -86,6 +59,13 @@ export function getNonAnnotationCommentLineContents(lineIndex: number, annotated
 		nonWhitespaceContentRanges,
 		hasNonWhitespaceContent: nonWhitespaceContentRanges.length > 0,
 	}
+}
+
+/**
+ * Returns a copy of the given array of ranges, excluding any ranges that only contain whitespace.
+ */
+export function excludeWhitespaceRanges(codeLines: string[], ranges: SourceRange[]) {
+	return ranges.filter((range) => codeLines[range.start.line].slice(range.start.column, range.end.column).search(/\S/) > -1)
 }
 
 /**

@@ -126,6 +126,9 @@ export function parseSingleLineParentComment(options: ParseParentCommentOptions)
 			}
 		}
 
+		// The inner range starts after the comment syntax and ends at the end of the comment
+		const commentInnerRange = createRange({ codeLines, start: { line: tagLineIndex, column: singleLineCommentSyntax.endColumn }, end: commentRange.end })
+
 		// For single-line comments, the annotation range is always equal to the comment range
 		const annotationRange = createRange({ codeLines, start: commentRange.start, end: commentRange.end })
 
@@ -133,6 +136,7 @@ export function parseSingleLineParentComment(options: ParseParentCommentOptions)
 			tag,
 			contents,
 			commentRange,
+			commentInnerRange,
 			annotationRange,
 			contentRanges,
 			targetRanges: [],

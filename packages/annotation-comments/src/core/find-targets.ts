@@ -95,6 +95,6 @@ export function findAnnotationTargets(annotatedCode: AnnotatedCode) {
 			}
 		}
 		// In case of a negative direction, fix the potentially mixed up order of target ranges
-		if (relativeTargetRange < 0) targetRanges.sort((a, b) => compareRanges(b, a, 'start'))
+		if (relativeTargetRange < 0) targetRanges.sort((a, b) => compareRanges(a, b, 'start'))
 	})
 }

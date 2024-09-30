@@ -269,7 +269,9 @@ function getCommentFromMatchingSyntaxPair(options: {
 		const commentInnerRange = createRange({
 			codeLines,
 			start: match.openingRangeWithWhitespace.end,
-			end: match.closingRangeWithWhitespace.start,
+			// If the closing range with leading whitespace starts at the beginning of the line,
+			// include the optional whitespace in the inner range
+			end: !match.closingRangeWithWhitespace.start.column ? match.closingRangeWithWhitespace.start : match.closingRange.start,
 		})
 		// If the opening sequence ends at a line boundary, adjust the inner range to exclude it
 		if (!commentInnerRange.start.column && !isOnSingleLine) {
@@ -308,6 +310,8 @@ function getCommentFromMatchingSyntaxPair(options: {
 				// comment with multiple pieces of content and we must limit the annotation range
 				// to the current annotation (however, we still include the separator line)
 				annotationRange.start = { line: tag.range.start.line }
+				// If the tag is located on the comment opening line, protect the opening sequence
+				if (tag.range.start.line === match.openingRange.start.line) annotationRange.start.column = match.openingRange.end.column
 				annotationRange.end = { line: lineIndex }
 				break
 			} else if (lineIndex >= tag.range.end.line && lineContent.content.startsWith('[!')) {
@@ -315,6 +319,8 @@ function getCommentFromMatchingSyntaxPair(options: {
 				// comment with multiple pieces of content and we must limit the annotation range
 				// to the current annotation
 				annotationRange.start = { line: tag.range.start.line }
+				// If the tag is located on the comment opening line, protect the opening sequence
+				if (tag.range.start.line === match.openingRange.start.line) annotationRange.start.column = match.openingRange.end.column
 				annotationRange.end = { line: lineIndex - 1 }
 				break
 			} else {
@@ -337,6 +343,7 @@ function getCommentFromMatchingSyntaxPair(options: {
 			tag,
 			contents,
 			commentRange,
+			commentInnerRange,
 			annotationRange,
 			contentRanges,
 			targetRanges: [],

@@ -27,7 +27,7 @@ export function validateAnnotationComment(actual: AnnotationComment, codeLines: 
 	if (expected.contents) expect(actual.contents, 'Unexpected contents').toEqual(expected.contents)
 	if (expected.commentRange) expect(actual.commentRange, 'Unexpected commentRange').toEqual(expected.commentRange)
 	const expectedAnnotationRange = expected.annotationRange ?? expected.commentRange
-	if (expectedAnnotationRange) expect(actual.annotationRange, 'Unexpected commentRange').toEqual(expectedAnnotationRange)
+	if (expectedAnnotationRange) expect(actual.annotationRange, 'Unexpected annotationRange').toEqual(expectedAnnotationRange)
 	const expectedTargetRanges = expected.targetRangeRegExp ? findRegExpTargetRanges(codeLines, createGlobalRegExp(expected.targetRangeRegExp)) : expected.targetRanges
 	if (expectedTargetRanges) expect(actual.targetRanges, 'Unexpected targetRanges').toEqual(expectedTargetRanges)
 

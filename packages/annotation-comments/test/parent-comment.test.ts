@@ -549,6 +549,46 @@ describe('parseParentComment()', () => {
 					annotationRange: { start: { line: 3 }, end: { line: 5 } },
 				})
 			})
+			test('Excludes the opening syntax even without a line break before it (1)', () => {
+				const lines = [
+					// Multi-line annotation starting directly after the opening syntax
+					'\t/** [!note] Annotation content',
+					'\t * that spans multiple lines',
+					'\t * until the comment ends',
+					// Another annotation makes this a mixed comment
+					'\t * [!ins]',
+					'\t */',
+					'\tsomeCode()',
+				]
+				validateParentComment({
+					lines,
+					contents: ['Annotation content', 'that spans multiple lines', 'until the comment ends'],
+					commentRange: { start: { line: 2 }, end: { line: 6 } },
+					// Expect the opening, other annotation and closing syntax not to be included
+					// in the annotation range
+					annotationRange: { start: { line: 2, column: lines[0].indexOf(' [!') }, end: { line: 4 } },
+				})
+			})
+			test('Excludes the opening syntax even without a line break before it (2)', () => {
+				const lines = [
+					// Single-line annotation starting directly after the opening syntax
+					'\t/** [!ins]',
+					// Another annotation that makes this a mixed comment
+					'\t * [!note] Annotation content',
+					'\t * that spans multiple lines',
+					'\t * until the comment ends',
+					'\t */',
+					'\tsomeCode()',
+				]
+				validateParentComment({
+					lines,
+					contents: [],
+					commentRange: { start: { line: 2 }, end: { line: 6 } },
+					// Expect the opening, non-annotation content and closing syntax not to be included
+					// in the annotation range
+					annotationRange: { start: { line: 2, column: lines[0].indexOf(' [!') }, end: { line: 2 } },
+				})
+			})
 			test('Excludes the closing syntax even without a line break before it', () => {
 				const lines = [
 					'\t/**',
@@ -566,7 +606,7 @@ describe('parseParentComment()', () => {
 					commentRange: { start: { line: 2 }, end: { line: 6 } },
 					// Expect the opening, non-annotation content and closing syntax not to be included
 					// in the annotation range
-					annotationRange: { start: { line: 4 }, end: { line: 6, column: lines[4].indexOf(' */') } },
+					annotationRange: { start: { line: 4 }, end: { line: 6, column: lines[4].indexOf('*/') } },
 				})
 			})
 			test('Ends the annotation when encountering another annotation tag', () => {
