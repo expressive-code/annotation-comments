@@ -75,6 +75,11 @@ type AnnotationComment = {
   contents: string[]
   commentRange: SourceRange
   commentInnerRange: SourceRange
+  commentSyntax: {
+    opening: string
+    closing?: string | undefined
+    continuationLineStart?: RegExp | undefined
+  }
   annotationRange: SourceRange
   contentRanges: SourceRange[]
   targetRanges: SourceRange[]

@@ -15,6 +15,28 @@ export type AnnotationComment = {
 	 */
 	commentInnerRange: SourceRange
 	/**
+	 * The syntax used by the parent comment that contains the annotation.
+	 */
+	commentSyntax: {
+		/**
+		 * The opening syntax (e.g. `//` or `/*` for JS-style comments).
+		 */
+		opening: string
+		/**
+		 * The closing syntax (e.g. `-->` for HTML-style comments).
+		 *
+		 * This is `undefined` for single-line comment syntaxes.
+		 */
+		closing?: string | undefined
+		/**
+		 * The syntax used to start a new line inside the parent comment.
+		 * Used by JSDoc-style comments (e.g. `*`).
+		 *
+		 * This is `undefined` for single-line comment syntaxes.
+		 */
+		continuationLineStart?: RegExp | undefined
+	}
+	/**
 	 * The outer range of the annotation, covering both the annotation tag and
 	 * any optional content.
 	 *

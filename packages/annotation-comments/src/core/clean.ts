@@ -1,5 +1,5 @@
-import { cloneRange, createSingleLineRange, excludeRangesFromOuterRange, mergeIntersectingOrAdjacentRanges, rangesAreEqual, splitRangeByLines } from '../internal/ranges'
-import { excludeWhitespaceRanges } from '../internal/text-content'
+import { cloneRange, excludeRangesFromOuterRange, mergeIntersectingOrAdjacentRanges, rangesAreEqual, splitRangeByLines } from '../internal/ranges'
+import { excludeWhitespaceRanges, getTextContentInLine } from '../internal/text-content'
 import type { AnnotatedCode, AnnotationComment, SourceLocation, SourceRange } from './types'
 
 export type CleanCodeOptions = AnnotatedCode & {
@@ -49,9 +49,27 @@ export function cleanCode(options: CleanCodeOptions) {
 		// If we're removing an entire annotation, include up to one line of whitespace above it
 		const lineAboveIndex = rangeToBeRemoved.start.line - 1
 		if (removeEntireAnnotation && annotationComment.commentInnerRange.start.line < lineAboveIndex) {
-			const contentInLineAbove = excludeWhitespaceRanges(codeLines, [createSingleLineRange(lineAboveIndex)])
-			if (!contentInLineAbove.length) {
+			const { content } = getTextContentInLine({
+				codeLines,
+				lineIndex: lineAboveIndex,
+				continuationLineStart: annotationComment.commentSyntax.continuationLineStart,
+			})
+			if (!content) {
 				rangeToBeRemoved.start = { line: lineAboveIndex }
+			}
+		}
+
+		// If we're only removing the tag, also remove whitespace between the tag and content
+		if (!removeEntireAnnotation && hasContents) {
+			const firstContentStart = annotationComment.contentRanges[0].start
+			if (!annotationComment.commentSyntax.closing && firstContentStart.line > rangeToBeRemoved.start.line) {
+				// If the comment uses a single-line syntax and the first content starts on a line
+				// below the tag, remove the entire tag line including the comment syntax
+				rangeToBeRemoved.start = { line: rangeToBeRemoved.start.line }
+			} else {
+				// Otherwise (multi-line syntax or content starting at the tag line),
+				// just extend the range to the start of the first content
+				rangeToBeRemoved.end = { line: firstContentStart.line, column: firstContentStart.column ?? 0 }
 			}
 		}
 

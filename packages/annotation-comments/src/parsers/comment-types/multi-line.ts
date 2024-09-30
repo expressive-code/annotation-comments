@@ -344,6 +344,9 @@ function getCommentFromMatchingSyntaxPair(options: {
 			contents,
 			commentRange,
 			commentInnerRange,
+			commentSyntax: {
+				...syntax,
+			},
 			annotationRange,
 			contentRanges,
 			targetRanges: [],

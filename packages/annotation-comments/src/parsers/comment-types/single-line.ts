@@ -137,6 +137,9 @@ export function parseSingleLineParentComment(options: ParseParentCommentOptions)
 			contents,
 			commentRange,
 			commentInnerRange,
+			commentSyntax: {
+				opening: singleLineCommentSyntax.syntax,
+			},
 			annotationRange,
 			contentRanges,
 			targetRanges: [],
