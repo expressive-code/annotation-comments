@@ -29,9 +29,5 @@
     "test-short": "vitest run --reporter basic",
     "test-watch": "vitest --reporter verbose",
     "watch": "pnpm build --watch src"
-  },
-  "engines": {
-    "node": "^14.15.0 || >=16.0.0",
-    "pnpm": ">=8.0.0"
   }
 }
