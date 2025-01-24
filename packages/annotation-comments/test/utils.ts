@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
-import type { AnnotationComment, AnnotationTag, SourceRange } from '../src/core/types'
+import type { AnnotationComment, AnnotationTag, SourceLocation, SourceRange } from '../src/core/types'
 import { createGlobalRegExp, findRegExpMatchColumnRanges } from '../src/internal/regexps'
-import { createRange } from '../src/internal/ranges'
+import { createRange, isEmptyRange } from '../src/internal/ranges'
 
 export function splitCodeLines(code: string) {
 	return code.trim().split(/\r?\n/)
@@ -70,4 +70,53 @@ export function findRegExpTargetRanges(codeLines: string[], regExp: RegExp) {
 		})
 	})
 	return ranges
+}
+
+/**
+ * Generates all possible permutations of an array of the given length
+ * with the specified number of elements omitted. Returns arrays of indices.
+ */
+export function getArrayPermutations(arrayLength: number, omitCount: number): number[][] {
+	if (omitCount < 0 || omitCount > arrayLength) throw new Error('Invalid omitCount value')
+
+	const result: number[][] = []
+	const generate = (start: number, currentSubset: number[]) => {
+		if (currentSubset.length === arrayLength - omitCount) {
+			result.push([...currentSubset])
+			return
+		}
+
+		for (let i = start; i < arrayLength; i++) {
+			currentSubset.push(i)
+			generate(i + 1, currentSubset)
+			currentSubset.pop()
+		}
+	}
+
+	generate(0, [])
+	return result
+}
+
+export function formatSourceLocation(location: SourceLocation) {
+	return `${location.line}${location.column !== undefined ? `:${location.column}` : ''}`
+}
+
+export function formatSourceRange(range: SourceRange) {
+	const rangeStr = `${formatSourceLocation(range.start)}-${formatSourceLocation(range.end)}`
+	if (isEmptyRange(range)) return `empty(${rangeStr})`
+	return rangeStr
+}
+
+export function formatAnnotationComment(comment: AnnotationComment) {
+	const result: string[] = []
+	result.push(`tag=${comment.tag.rawTag}`)
+	result.push(`tagRange=${formatSourceRange(comment.tag.range)}`)
+	result.push(`commentRange=${formatSourceRange(comment.commentRange)}`)
+	result.push(`commentInnerRange=${formatSourceRange(comment.commentInnerRange)}`)
+	result.push(`annotationRange=${formatSourceRange(comment.annotationRange)}`)
+	return result.join(',')
+}
+
+export function formatAnnotationComments(comments: AnnotationComment[]) {
+	return comments.map((comment) => `{${formatAnnotationComment(comment)}}`).join('\n')
 }

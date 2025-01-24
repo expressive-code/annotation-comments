@@ -14,6 +14,15 @@ export function createRange(options: { codeLines: string[]; start: SourceLocatio
 	return range
 }
 
+export function makeRangeEmpty(range: SourceRange) {
+	range.end = { line: range.start.line, column: range.start.column ?? 0 }
+}
+
+export function isEmptyRange(range: SourceRange): boolean {
+	if (range.start.line !== range.end.line) return false
+	return range.end.column === 0 || range.end.column === (range.start.column ?? 0)
+}
+
 /**
  * Returns a copy of the given source range.
  */
@@ -117,7 +126,10 @@ export function mergeIntersectingOrAdjacentRanges(ranges: SourceRange[]): Source
 		}
 		// If the new range starts inside or right at the end of the current one,
 		// extend the current range if needed
-		if (compareRanges(newRange, currentRange, 'start', 'end') <= 0) {
+		if (
+			compareRanges(newRange, currentRange, 'start', 'end') <= 0 ||
+			(currentRange.end.line + 1 == newRange.start.line && currentRange.end.column === undefined && !newRange.start.column)
+		) {
 			if (compareRanges(newRange, currentRange, 'end') > 0) currentRange.end = newRange.end
 			continue
 		}
@@ -137,7 +149,7 @@ export function mergeIntersectingOrAdjacentRanges(ranges: SourceRange[]): Source
  * and full line ranges. The array can also be empty if the outer range is completely covered
  * by the exclusions.
  */
-export function excludeRangesFromOuterRange(options: { codeLines: string[]; outerRange: SourceRange; rangesToExclude: SourceRange[] }): SourceRange[] {
+export function excludeRangesFromOuterRange(options: { codeLines?: string[] | undefined; outerRange: SourceRange; rangesToExclude: SourceRange[] }): SourceRange[] {
 	const { codeLines, outerRange, rangesToExclude } = options
 
 	const remainingRanges: SourceRange[] = splitRangeByLines(outerRange)
@@ -145,7 +157,7 @@ export function excludeRangesFromOuterRange(options: { codeLines: string[]; oute
 
 	exclusionsSplitByLine.forEach((exclusion) => {
 		const lineIndex = exclusion.start.line
-		const lineLength = codeLines[lineIndex].length
+		const lineLength = codeLines?.[lineIndex].length ?? Infinity
 		const exclusionStartColumn = exclusion.start.column ?? 0
 		const exclusionEndColumn = exclusion.end.column ?? lineLength
 		for (let i = remainingRanges.length - 1; i >= 0; i--) {

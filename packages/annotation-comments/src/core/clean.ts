@@ -1,15 +1,23 @@
-import { cloneRange, excludeRangesFromOuterRange, mergeIntersectingOrAdjacentRanges, rangesAreEqual, splitRangeByLines } from '../internal/ranges'
+import { cloneRange, excludeRangesFromOuterRange, isEmptyRange, makeRangeEmpty, mergeIntersectingOrAdjacentRanges, rangesAreEqual, splitRangeByLines } from '../internal/ranges'
 import { excludeWhitespaceRanges, getTextContentInLine } from '../internal/text-content'
-import type { AnnotatedCode, AnnotationComment, SourceLocation, SourceRange } from './types'
+import type { AnnotatedCode, AnnotationComment, SourceRange } from './types'
 
 export type CleanCodeOptions = AnnotatedCode & {
-	removeAnnotationContents?: boolean | ((context: RemoveAnnotationContentsContext) => boolean)
-	updateTargetRanges?: boolean
+	/**
+	 * An optional function that is called for each annotation comment.
+	 * Its return value determines whether the annotation should be cleaned from the code.
+	 */
+	allowCleaning?: (context: CleanAnnotationContext) => boolean
+	removeAnnotationContents?: boolean | ((context: CleanAnnotationContext) => boolean)
+	/**
+	 * Whether to update all ranges in the annotation comments after applying the changes.
+	 */
+	updateCodeRanges?: boolean
 	handleRemoveLine?: (context: HandleRemoveLineContext) => boolean
 	handleEditLine?: (context: HandleEditLineContext) => boolean
 }
 
-export type RemoveAnnotationContentsContext = {
+export type CleanAnnotationContext = {
 	comment: AnnotationComment
 }
 
@@ -36,12 +44,18 @@ export type EditLine = {
 type SourceChange = RemoveLine | EditLine
 
 export function cleanCode(options: CleanCodeOptions) {
-	const { codeLines, annotationComments, removeAnnotationContents = false, updateTargetRanges = true, handleRemoveLine, handleEditLine } = options
+	const { codeLines, annotationComments, removeAnnotationContents = false, updateCodeRanges = true, handleRemoveLine, handleEditLine } = options
 
-	// Go through all annotation comments and collect an array of ranges to be removed
+	// Create a subset of annotation comments to clean
+	const commentsToClean = annotationComments.filter((comment) => typeof options.allowCleaning !== 'function' || options.allowCleaning({ comment }))
+
+	// Go through all annotation comments to clean and collect an array of ranges to be removed
 	const rangesToBeRemoved: SourceRange[] = []
-	annotationComments.forEach((annotationComment) => {
-		const hasContents = annotationComment.contents.length > 0
+	commentsToClean.forEach((annotationComment) => {
+		if (isEmptyRange(annotationComment.annotationRange)) return
+
+		// Determine whether to remove the entire annotation or just the tag
+		const hasContents = annotationComment.contentRanges.length && annotationComment.contents.length
 		const removeEntireAnnotation =
 			!hasContents || (typeof removeAnnotationContents === 'function' ? removeAnnotationContents({ comment: annotationComment }) : removeAnnotationContents)
 		const rangeToBeRemoved = cloneRange(removeEntireAnnotation ? annotationComment.annotationRange : annotationComment.tag.range)
@@ -78,7 +92,7 @@ export function cleanCode(options: CleanCodeOptions) {
 
 	// Remove any parent comments that would be empty after removing the annotations
 	const handledRanges: SourceRange[] = []
-	annotationComments.forEach(({ commentRange, commentInnerRange }) => {
+	commentsToClean.forEach(({ commentRange, commentInnerRange }) => {
 		if (handledRanges.some((range) => rangesAreEqual(range, commentInnerRange))) return
 		handledRanges.push(commentInnerRange)
 		// If the outer range is already in the list of ranges to be removed, skip this comment
@@ -105,44 +119,66 @@ export function cleanCode(options: CleanCodeOptions) {
 			if (!handleRemoveLine || !handleRemoveLine({ codeLines, ...change })) {
 				codeLines.splice(change.lineIndex, 1)
 			}
-			if (updateTargetRanges) updateTargetRangesAfterRemoveLine(annotationComments, change)
+			if (updateCodeRanges) updateCodeRangesAfterChange(annotationComments, change)
 		} else {
 			if (!handleEditLine || !handleEditLine({ codeLines, ...change })) {
 				const line = codeLines[change.lineIndex]
 				codeLines[change.lineIndex] = line.slice(0, change.startColumn) + (change.newText ?? '') + line.slice(change.endColumn)
 			}
-			if (updateTargetRanges) updateTargetRangesAfterEditLine(annotationComments, change)
+			if (updateCodeRanges) updateCodeRangesAfterChange(annotationComments, change)
 		}
 	})
 }
 
-function updateTargetRangesAfterRemoveLine(annotationComments: AnnotationComment[], change: RemoveLine) {
-	annotationComments.forEach(({ targetRanges }) => {
-		targetRanges.forEach((targetRange, index) => {
-			if (targetRange.start.line === change.lineIndex) {
-				targetRanges.splice(index, 1)
-			} else if (targetRange.start.line > change.lineIndex) {
-				targetRange.start.line--
-				targetRange.end.line--
-			}
-		})
+function updateCodeRangesAfterChange(annotationComments: AnnotationComment[], change: RemoveLine | EditLine) {
+	annotationComments.forEach((comment) => {
+		updateCodeRange(comment.tag.range, change)
+		updateCodeRange(comment.annotationRange, change)
+		updateCodeRange(comment.commentRange, change)
+		updateCodeRange(comment.commentInnerRange, change)
+		updateCodeRanges(comment.contentRanges, change)
+		updateCodeRanges(comment.targetRanges, change)
 	})
 }
 
-function updateTargetRangesAfterEditLine(annotationComments: AnnotationComment[], change: EditLine) {
-	annotationComments.forEach(({ targetRanges }) => {
-		targetRanges.forEach((targetRange) => {
-			updateLocationIfNecessary(targetRange.start, change)
-			updateLocationIfNecessary(targetRange.end, change)
-		})
-	})
+function updateCodeRanges(ranges: SourceRange[], change: RemoveLine | EditLine) {
+	ranges.forEach((range) => updateCodeRange(range, change))
+	for (let i = ranges.length - 1; i >= 0; i--) {
+		if (isEmptyRange(ranges[i])) ranges.splice(i, 1)
+	}
 }
 
-function updateLocationIfNecessary(location: SourceLocation, change: EditLine) {
-	if (location.line !== change.lineIndex) return
-	if (!location.column || change.startColumn > location.column) return
-	const changeDelta = (change.newText?.length ?? 0) - (change.endColumn - change.startColumn)
-	location.column += changeDelta
+export function updateCodeRange(range: SourceRange, change: RemoveLine | EditLine) {
+	const { start, end } = range
+	const changeLine = change.lineIndex
+	if (change.editType === 'removeLine') {
+		// Range was completely inside the removed line and is now empty
+		if (start.line === changeLine && end.line === changeLine) return makeRangeEmpty(range)
+		// Range ended at the removed line, so it now ends at the end of the previous line
+		if (end.line === changeLine) range.end = { line: changeLine - 1 }
+		// Range ended after the removed line, so keep column, but move line up
+		if (end.line > changeLine) end.line--
+		// Range started at the removed line, so it now starts at the beginning of the new line
+		if (start.line === changeLine) range.start = { line: changeLine }
+		// Range started after the removed line, so keep column, but move line up
+		if (start.line > changeLine) start.line--
+	} else {
+		// Ignore inline edits that do not affect the start or end line of the range
+		if (start.line !== changeLine && end.line !== changeLine) return
+		const changeDelta = change.endColumn - change.startColumn + (change.newText?.length ?? 0)
+		const rangeStartColumn = start.column ?? 0
+		const rangeEndColumn = end.column ?? Infinity
+		// If the inline edit completely covers the range, the range is now empty
+		if (start.line === end.line && change.startColumn <= rangeStartColumn && change.endColumn >= rangeEndColumn) return makeRangeEmpty(range)
+		// Range started at the edited line after the edit, so adjust its start column
+		if (start.line === changeLine && change.startColumn < rangeStartColumn) {
+			start.column = rangeStartColumn - Math.min(changeDelta, rangeStartColumn - change.startColumn)
+		}
+		// Range ended at the edited line after the edit, so adjust its end column
+		if (end.line === changeLine && change.startColumn < rangeEndColumn) {
+			end.column = rangeEndColumn === Infinity ? undefined : rangeEndColumn - Math.min(changeDelta, rangeEndColumn - change.startColumn)
+		}
+	}
 }
 
 function getRangeRemovalChanges(codeLines: string[], range: SourceRange): SourceChange[] {
