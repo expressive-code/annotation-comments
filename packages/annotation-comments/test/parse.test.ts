@@ -31,7 +31,7 @@ import { defineConfig } from 'astro/config';
 /**
  * Some JSDoc test.
  *
- * [!note:test] The \`test\` function here is just an example
+ * [!note:"test"] The \`test\` function here is just an example
  * and doesn't do anything meaningful.
  *
  * Also note that we just added a [!note] tag to an existing
@@ -102,7 +102,7 @@ export default defineConfig({
     /* [!del] */ color: blue;
   }
   body, html, .test[data-size="large"], #id {
-    /* [!note:linear-gradient]
+    /* [!note:"linear-gradient"]
        As this [!note] points out, we let the browser
        create a gradient for us here. */
     background: linear-gradient(to top, #80f 1px, rgb(30, 90, 130) 50%);
@@ -152,7 +152,7 @@ const { title } = Astro.props
 <div id="content-wrapper" class="test">
   <Header />
   <Logo size="large"/>
-  <!-- [!note:{title}] By wrapping any variable name in curly braces,
+  <!-- [!note:"{title}"] By wrapping any variable name in curly braces,
        we can output its value in the HTML template,
        as explained by this [!note] annotation. -->
   <h1>{title} &amp; some text</h1>
@@ -171,7 +171,7 @@ const { title } = Astro.props
 					commentRange: { start: { line: 5 }, end: { line: 6 } },
 					annotationRange: { start: { line: 5 }, end: { line: 6 } },
 					// Expect only the capture group inside the full match to be highlighted
-					targetRangeRegExp: /(?<!:)\{ ?(title) ?\}/,
+					targetRangeRegExp: /(?<!:")\{ ?(title) ?\}/,
 				},
 				{
 					tag: { name: 'note', targetSearchQuery: '{title}' },
@@ -196,7 +196,7 @@ const { title } = Astro.props
 			const pythonTestCode = `
 import time
 
-# [!note:countdown:2] Prints a countdown from the given time,
+# [!note:'countdown':2] Prints a countdown from the given time,
 # as explained by this # [!note] annotation.
 def countdown(time_sec):
   while time_sec:
@@ -309,10 +309,10 @@ countdown(9) // This one is out of the target range
 				},
 			])
 		})
-		test('[!ignore-tags:note] ignores the next occurrence of "note"', () => {
+		test('[!ignore-tags:"note"] ignores the next occurrence of "note"', () => {
 			const lines = [
 				`// [!before] This is before any ignores`,
-				`// [!ignore-tags:note]`,
+				`// [!ignore-tags:"note"]`,
 				`console.log('Some code')`,
 				`testCode() // [!note] This should not be parsed`,
 				`// [!note] This should be parsed again`,
@@ -329,10 +329,10 @@ countdown(9) // This one is out of the target range
 				},
 			])
 		})
-		test('[!ignore-tags:note,ins:3] ignores the next 3 occurrences of "note" and "ins"', () => {
+		test('[!ignore-tags:"note,ins":3] ignores the next 3 occurrences of "note" and "ins"', () => {
 			const lines = [
 				`// [!before] This is before any ignores`,
-				`// [!ignore-tags:note,ins:3]`,
+				`// [!ignore-tags:"note,ins":3]`,
 				`console.log('Some code') // [!ins]`,
 				`testCode() // [!note] This should not be parsed`,
 				`// [!ins] // [!note] Still ignored`,
@@ -397,7 +397,7 @@ countdown(9) // This one is out of the target range
 				`// [!ignore-tags:-2]`,
 				`someMoreCode()`,
 				`console.log('Test') // [!ins3]`,
-				`/* [!ignore-tags:ins3:-1] */`,
+				`/* [!ignore-tags:"ins3":-1] */`,
 				`// [!note] A regular note`,
 			]
 			validateParsedComments(
@@ -441,7 +441,7 @@ countdown(9) // This one is out of the target range
 				`console.log('Some code') // [!ignore-tags] // [!ins1]`,
 				`// [!ins2]`,
 				`testCode() // [!ignore-tags]`,
-				`/* [!ignore-tags:ins3] */ someMoreCode()`,
+				`/* [!ignore-tags:"ins3"] */ someMoreCode()`,
 				`console.log('Test') // [!ins3]`,
 				`// [!note] A regular note`,
 			]
@@ -744,7 +744,7 @@ countdown(9) // This one is out of the target range
 			})
 		})
 		describe('Tag with a target search query', () => {
-			test('[!tag:search term] at the end of a non-empty line starts searching at the current line', () => {
+			test('[!tag:<search term>] at the end of a non-empty line starts searching at the current line', () => {
 				const codeLines = [
 					`Start of test code`,
 					// Empty lines above and below
@@ -771,7 +771,7 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/ }, targetRangeRegExp: /.*target4/ },
 				])
 			})
-			test('[!tag:search term] at the end of a non-empty line always searches downwards', () => {
+			test('[!tag:<search term>] at the end of a non-empty line always searches downwards', () => {
 				const codeLines = [
 					`Start of test code`,
 					// Empty lines above and below
@@ -804,7 +804,7 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/ }, targetRangeRegExp: /.*target4/ },
 				])
 			})
-			test(`[!tag:search term] on its own line searches downwards if the first line below is non-empty`, () => {
+			test(`[!tag:<search term>] on its own line searches downwards if the first line below is non-empty`, () => {
 				const codeLines = [
 					`Start of test code`,
 					``,
@@ -854,7 +854,7 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/ }, targetRangeRegExp: /.*target5/ },
 				])
 			})
-			test(`[!tag:search term] on its own line searches upwards if only below is empty`, () => {
+			test(`[!tag:<search term>] on its own line searches upwards if only below is empty`, () => {
 				const codeLines = [
 					`Start of test code`,
 					``,
@@ -900,7 +900,7 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/ }, targetRangeRegExp: /.*target5/ },
 				])
 			})
-			test(`[!tag:search term] on its own line searches downwards if below and above are empty`, () => {
+			test(`[!tag:<search term>] on its own line searches downwards if below and above are empty`, () => {
 				const codeLines = [
 					`Start of test code`,
 					``,
@@ -953,7 +953,7 @@ countdown(9) // This one is out of the target range
 			})
 		})
 		describe('Tag with a target search query and relative target range', () => {
-			test(`[!tag:search term:3] on its own line searches 3 matches downwards`, () => {
+			test(`[!tag:<search term>:3] on its own line searches 3 matches downwards`, () => {
 				const codeLines = [
 					`Start of test code`,
 					``,
@@ -1010,7 +1010,7 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 3 }, targetRangeRegExp: /.*target4/ },
 				])
 			})
-			test(`[!tag:search term:-3] on its own line searches 3 matches upwards`, () => {
+			test(`[!tag:<search term>:-3] on its own line searches 3 matches upwards`, () => {
 				const codeLines = [
 					`Start of test code`,
 					``,
@@ -1067,7 +1067,7 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/, relativeTargetRange: -3 }, targetRangeRegExp: /.*target4/ },
 				])
 			})
-			test(`[!tag:search term:3] at the end of a non-empty line searches forwards from the start of the current line`, () => {
+			test(`[!tag:<search term>:3] at the end of a non-empty line searches forwards from the start of the current line`, () => {
 				const codeLines = [
 					`Start of test code`,
 					// Empty lines above and below
@@ -1101,7 +1101,7 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 3 }, targetRangeRegExp: /target4/ },
 				])
 			})
-			test(`[!tag:search term:3] at the beginning of a non-empty line searches forwards from the start of the current line`, () => {
+			test(`[!tag:<search term>:3] at the beginning of a non-empty line searches forwards from the start of the current line`, () => {
 				const codeLines = [
 					`Start of test code`,
 					// Empty lines above and below
@@ -1134,7 +1134,7 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 3 }, targetRangeRegExp: /target4/ },
 				])
 			})
-			test(`[!tag:search term:-3] at the end of a non-empty line searches backwards from the end of the current line`, () => {
+			test(`[!tag:<search term>:-3] at the end of a non-empty line searches backwards from the end of the current line`, () => {
 				const codeLines = [
 					`Start of test code`,
 					// Empty lines above and below
@@ -1175,7 +1175,7 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/, relativeTargetRange: -3 }, targetRangeRegExp: /target5/ },
 				])
 			})
-			test(`[!tag:search term:-3] at the beginning of a non-empty line searches backwards from the end of the current line`, () => {
+			test(`[!tag:<search term>:-3] at the beginning of a non-empty line searches backwards from the end of the current line`, () => {
 				const codeLines = [
 					`Start of test code`,
 					// Empty lines above and below
@@ -1222,6 +1222,8 @@ countdown(9) // This one is out of the target range
 	function validateParsedComments(code: string | string[], expectedComments: ExpectedAnnotationComment[], expectedErrors: RegExp[] = []) {
 		const codeLines = Array.isArray(code) ? code : splitCodeLines(code)
 		const { annotationComments, errorMessages } = parseAnnotationComments({ codeLines })
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+		expect(errorMessages).toEqual(expectedErrors.map((regExp) => expect.stringMatching(regExp)))
 		const expectedTagNames = expectedComments.map(({ tag }) => tag?.name || 'no tag').join(', ')
 		const actualTagNames = annotationComments.map(({ tag }) => tag?.name || 'no tag').join(', ')
 		expect(actualTagNames, 'Unexpected tags').toBe(expectedTagNames)
@@ -1229,7 +1231,5 @@ countdown(9) // This one is out of the target range
 			validateAnnotationComment(annotationComments[index], codeLines, expectedComment)
 		})
 		expect(annotationComments).toHaveLength(expectedComments.length)
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-return
-		expect(errorMessages).toEqual(expectedErrors.map((regExp) => expect.stringMatching(regExp)))
 	}
 })

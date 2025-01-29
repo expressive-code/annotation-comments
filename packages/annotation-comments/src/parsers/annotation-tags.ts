@@ -46,15 +46,6 @@ const annotationTagRegex = new RegExp(
 						delimiter,
 					].join('')
 				),
-				// Last alternative: Non-quoted query string
-				[
-					// It must not start with a digit, optionally preceded by a dash:
-					'(?!-?\\d)',
-					// It must contain at least one of the following parts:
-					// - any character that is not a backslash, colon, or closing bracket
-					// - a backslash followed by any character
-					`(?:[^\\\\:\\]]|\\\\.)+?`,
-				].join(''),
 			].join('|'),
 			// End of capture group
 			')',
@@ -68,7 +59,15 @@ const annotationTagRegex = new RegExp(
 			// Colon separator
 			':',
 			// Relative target range (captured)
-			'(-?\\d+)',
+			'(',
+			[
+				// Numeric range, defined by a positive or negative number
+				'-?\\d+',
+				// Anything else that is not a closing bracket
+				'[^\\]]+',
+			].join('|'),
+			// End of relative target range capture group
+			')',
 			// End of non-capturing optional group
 			')?',
 		],
@@ -104,6 +103,13 @@ function parseTargetSearchQuery(rawTargetSearchQuery: string | undefined): strin
 	return unescapedQuery
 }
 
+function parseRelativeTargetRange(rawInput: string | undefined): AnnotationTag['relativeTargetRange'] {
+	if (rawInput === undefined) return undefined
+	if (rawInput === 'start' || rawInput === 'begin') return 'start'
+	if (rawInput === 'end') return 'end'
+	return Number(rawInput)
+}
+
 export function parseAnnotationTags(options: ParseAnnotationTagsOptions): ParseAnnotationTagsResult {
 	const { codeLines } = options
 	const annotationTags: AnnotationTag[] = []
@@ -113,16 +119,23 @@ export function parseAnnotationTags(options: ParseAnnotationTagsOptions): ParseA
 		const matches = [...line.matchAll(annotationTagRegex)]
 		matches.forEach((match) => {
 			try {
-				const [, name, rawTargetSearchQuery, relativeTargetRange] = match
+				const [, name, rawTargetSearchQuery, rawRelativeTargetRange] = match
 				const rawTag = match[0]
 				const startColIndex = match.index
 				const endColIndex = startColIndex + rawTag.length
 
 				const targetSearchQuery = parseTargetSearchQuery(rawTargetSearchQuery)
+				const relativeTargetRange = parseRelativeTargetRange(rawRelativeTargetRange)
+				if (Number.isNaN(relativeTargetRange)) {
+					if (targetSearchQuery === undefined)
+						throw new Error(`Unexpected text "${rawRelativeTargetRange}" in tag. If you intended to specify a search query, it must be enclosed in quotes.`)
+					throw new Error(`Unexpected text "${rawRelativeTargetRange}" in relative target range. Expected a number or the keywords "start", "begin" or "end".`)
+				}
+
 				annotationTags.push({
 					name,
 					targetSearchQuery,
-					relativeTargetRange: relativeTargetRange !== undefined ? Number(relativeTargetRange) : undefined,
+					relativeTargetRange,
 					rawTag,
 					range: {
 						start: { line: lineIndex, column: startColIndex },

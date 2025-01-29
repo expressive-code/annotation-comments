@@ -22,6 +22,21 @@ describe('parseAnnotationTags()', () => {
 	})
 
 	describe('Returns error messages when invalid annotation tags are found', () => {
+		test('Unquoted target search query', () => {
+			const codeLines = [
+				// The following regular expression should cause an error to be returned
+				'// [!tag:search term:5] Note the unquoted target search query.',
+				'console.log("Some code");',
+			]
+			const { annotationTags, errorMessages } = parseAnnotationTags({ codeLines })
+
+			expect(annotationTags).toEqual([])
+			expect(errorMessages).toEqual([
+				// Expect the line number and search term to be called out,
+				// including a suggestion to enclose the search term in quotes
+				expect.stringMatching(/line 1.*search term.*enclosed in quotes/),
+			])
+		})
 		test('Single invalid regular expression', () => {
 			const codeLines = [
 				// The following regular expression should cause an error to be returned
@@ -118,46 +133,6 @@ describe('parseAnnotationTags()', () => {
 	})
 
 	describe('Parses target search queries', () => {
-		describe('Tags with unquoted target search query', () => {
-			test(`[!tag:search-term]`, ({ task }) => {
-				performTagTest({
-					rawTag: task.name,
-					name: 'tag',
-					targetSearchQuery: 'search-term',
-					relativeTargetRange: undefined,
-				})
-			})
-
-			test(`[!tag:term with spaces and chars like .,;?!"'/-]`, ({ task }) => {
-				performTagTest({
-					rawTag: task.name,
-					name: 'tag',
-					targetSearchQuery: `term with spaces and chars like .,;?!"'/-`,
-					relativeTargetRange: undefined,
-				})
-			})
-		})
-
-		describe('Tags with unquoted target search query and target range', () => {
-			test(`[!tag:search-term:5]`, ({ task }) => {
-				performTagTest({
-					rawTag: task.name,
-					name: 'tag',
-					targetSearchQuery: 'search-term',
-					relativeTargetRange: 5,
-				})
-			})
-
-			test(`[!tag:term with spaces and chars like .;/"'?!-, too:-2]`, ({ task }) => {
-				performTagTest({
-					rawTag: task.name,
-					name: 'tag',
-					targetSearchQuery: `term with spaces and chars like .;/"'?!-, too`,
-					relativeTargetRange: -2,
-				})
-			})
-		})
-
 		describe('Tags with quoted target search query', () => {
 			test(`[!tag:"double-quoted term"]`, ({ task }) => {
 				performTagTest({
@@ -239,6 +214,15 @@ describe('parseAnnotationTags()', () => {
 					name: 'tag',
 					targetSearchQuery: `single-quoted term`,
 					relativeTargetRange: -5,
+				})
+			})
+
+			test(`[!tag:"term with spaces and chars like .:;/'?!-, too":-2]`, ({ task }) => {
+				performTagTest({
+					rawTag: task.name,
+					name: 'tag',
+					targetSearchQuery: `term with spaces and chars like .:;/'?!-, too`,
+					relativeTargetRange: -2,
 				})
 			})
 		})
@@ -330,7 +314,7 @@ ${test.rawTag} Tag in a multi-line comment
 		}, [] as AnnotationTag[])
 		// Perform test
 		const { annotationTags, errorMessages } = parseAnnotationTags({ codeLines })
-		expect(annotationTags).toEqual(expectedAnnotationTags)
 		expect(errorMessages).toEqual([])
+		expect(annotationTags).toEqual(expectedAnnotationTags)
 	}
 })

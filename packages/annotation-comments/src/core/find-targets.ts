@@ -81,6 +81,8 @@ function findFullLineTargetRanges(options: {
 			lineIndex += step
 		}
 	}
+
+	// TODO: Handle relative target ranges `start` and `end` for full-line annotations
 }
 
 function findInlineTargetRanges(options: {
@@ -140,4 +142,6 @@ function findInlineTargetRanges(options: {
 			lineIndex += step
 		}
 	}
+
+	// TODO: Handle relative target ranges `start` and `end` for inline search queries
 }
