@@ -9,7 +9,6 @@
     "formatWithErrors": false,
     "indentStyle": "tab",
     "indentWidth": 2,
-    "lineEnding": "crlf",
     "lineWidth": 180,
     "attributePosition": "auto",
     "bracketSpacing": true
