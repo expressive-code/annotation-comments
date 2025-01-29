@@ -78,7 +78,6 @@ Annotation tags consist of the following parts:
   - If omitted, the annotation targets only 1 line or target search query match. Depending on the location of the annotation, this may be above, below, or on the line containing the annotation itself.
   - The following range types are supported:
     - A **numeric range** defined by positive or negative numbers, e.g. `:3`, `:-1`. Positive ranges extend downwards, negative ranges extend upwards from the location of the annotation. If the annotation shares a line with code, the range starts at this line. Otherwise, it starts at the first non-annotation line in the direction of the range. The special range `:0` can be used to create standalone annotations that do not target any code.
-    - A **range between two matching annotations** defined by the suffixes `:start` and `:end`, e.g. `// [!ins:start]`, followed by some code lines, and a matching `// [!ins:end]` to mark the end of the inserted code.
 - The **closing sequence** `]`
 
 ### Annotation content
@@ -675,7 +674,7 @@ The handler can return `true` to indicate that it has taken care of the change a
 ##### removeAnnotationContents?
 
 ```ts
-optional removeAnnotationContents: 
+optional removeAnnotationContents:
   | boolean
   | (context: CleanAnnotationContext) => boolean;
 ```
