@@ -1,8 +1,8 @@
 import type { AnnotationComment, AnnotationTag, SourceRange } from '../../core/types'
-import type { ParseParentCommentOptions } from '../parent-comment'
 import { escapeRegExp } from '../../internal/escaping'
 import { compareRanges, createRange } from '../../internal/ranges'
 import { getTextContentInLine } from '../../internal/text-content'
+import type { ParseParentCommentOptions } from '../parent-comment'
 
 type MultiLineCommentSyntax = {
 	opening: string
@@ -286,7 +286,8 @@ function getCommentFromMatchingSyntaxPair(options: {
 		const contentRanges: SourceRange[] = []
 
 		for (let lineIndex = commentInnerRange.start.line; lineIndex <= commentInnerRange.end.line; lineIndex++) {
-			const startColumn = lineIndex === tag.range.end.line ? tag.range.end.column : lineIndex === commentInnerRange.start.line ? commentInnerRange.start.column : undefined
+			const commentStartLineColumn = lineIndex === commentInnerRange.start.line ? commentInnerRange.start.column : undefined
+			const startColumn = lineIndex === tag.range.end.line ? tag.range.end.column : commentStartLineColumn
 			const endColumn = lineIndex === commentInnerRange.end.line ? commentInnerRange.end.column : undefined
 
 			const lineContent = getTextContentInLine({
@@ -379,6 +380,7 @@ function findAllCommentDelimiters(regExp: RegExp, line: string, startColumn: num
 	const matches: { index: number; leadingWhitespace: string; delimiter: string; trailingWhitespace: string }[] = []
 	let match: RegExpExecArray | null
 	regExp.lastIndex = startColumn ?? 0
+	// biome-ignore lint/suspicious/noAssignInExpressions: Iterating through matches is intended
 	while ((match = regExp.exec(line))) {
 		const leadingWhitespace = match[1] ?? ''
 		const delimiter = match[2] ?? ''

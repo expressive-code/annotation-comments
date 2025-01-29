@@ -11,12 +11,12 @@ export function createGlobalRegExp(pattern: string | RegExp, extraFlags?: string
 	let regExp: RegExp | undefined
 	try {
 		// Try to use regular expressions with capture group indices
-		regExp = new RegExp(pattern, 'gd' + (extraFlags || ''))
+		regExp = new RegExp(pattern, `gd${extraFlags || ''}`)
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	} catch (_error) {
 		try {
 			// Use fallback if unsupported
-			regExp = new RegExp(pattern, 'g' + (extraFlags || ''))
+			regExp = new RegExp(pattern, `g${extraFlags || ''}`)
 		} catch (error) {
 			throw new Error(`Failed to parse \`${pattern}\` as regular expression: ${coerceError(error).message}`)
 		}

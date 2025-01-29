@@ -1,9 +1,9 @@
-import type { AnnotationComment, SourceRange } from './types'
+import { coerceError } from '../internal/errors'
+import { secondRangeIsInFirst } from '../internal/ranges'
 import { parseAnnotationTags } from '../parsers/annotation-tags'
 import { parseParentComment } from '../parsers/parent-comment'
-import { secondRangeIsInFirst } from '../internal/ranges'
 import { findAnnotationTargets } from './find-targets'
-import { coerceError } from '../internal/errors'
+import type { AnnotationComment, SourceRange } from './types'
 
 export type ParseAnnotationCommentsOptions = {
 	codeLines: string[]
@@ -14,6 +14,12 @@ export type ParseAnnotationCommentsResult = {
 	errorMessages: string[]
 }
 
+/**
+ * Parses the given array of code lines to find all annotation comments and their targets.
+ *
+ * Returns an object that contains both all parsed annotation comments and any error messages
+ * that occurred during parsing.
+ */
 export function parseAnnotationComments(options: ParseAnnotationCommentsOptions): ParseAnnotationCommentsResult {
 	const { codeLines } = options
 	const annotationComments: AnnotationComment[] = []
@@ -49,7 +55,7 @@ export function parseAnnotationComments(options: ParseAnnotationCommentsOptions)
 				if (comment.annotationRange.start.column || comment.annotationRange.end.column) {
 					throw new Error('It must be on its own line.')
 				}
-				if (tag.relativeTargetRange !== undefined && !(tag.relativeTargetRange > 0)) {
+				if (tag.relativeTargetRange !== undefined && (typeof tag.relativeTargetRange !== 'number' || !(tag.relativeTargetRange > 0))) {
 					throw new Error('If given, the target range must be a positive number.')
 				}
 				const ignoreRange = tag.relativeTargetRange ?? 1

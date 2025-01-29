@@ -1,6 +1,6 @@
 import type { AnnotationComment, AnnotationTag } from '../core/types'
-import { parseSingleLineParentComment } from './comment-types/single-line'
 import { parseMultiLineParentComment } from './comment-types/multi-line'
+import { parseSingleLineParentComment } from './comment-types/single-line'
 
 export type ParseParentCommentOptions = {
 	codeLines: string[]

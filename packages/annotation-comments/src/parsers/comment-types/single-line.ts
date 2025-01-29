@@ -1,8 +1,8 @@
 import type { AnnotationComment, SourceRange } from '../../core/types'
-import type { ParseParentCommentOptions } from '../parent-comment'
 import { escapeRegExp } from '../../internal/escaping'
-import { getTextContentInLine } from '../../internal/text-content'
 import { createRange } from '../../internal/ranges'
+import { getTextContentInLine } from '../../internal/text-content'
+import type { ParseParentCommentOptions } from '../parent-comment'
 
 const singleLineCommentSyntaxes: string[] = [
 	// JS, TS, Java, C, C++, C#, F#, Rust, Go, etc.
@@ -67,9 +67,11 @@ export function parseSingleLineParentComment(options: ParseParentCommentOptions)
 				// The new comment must start after the current tag...
 				match.startColumn >= tagEndColumn &&
 				// ...it must use the same single-line comment syntax...
-				match.syntax == singleLineCommentSyntax.syntax &&
+				match.syntax === singleLineCommentSyntax.syntax &&
 				// ...and it must be followed by another annotation tag opening sequence
-				tagLine.slice(match.endColumn).startsWith('[!')
+				tagLine
+					.slice(match.endColumn)
+					.startsWith('[!')
 		)
 		if (chainedSingleLineCommentSyntax) {
 			commentRange.end.column = chainedSingleLineCommentSyntax.startColumn

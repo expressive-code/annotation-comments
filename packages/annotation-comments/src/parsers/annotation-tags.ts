@@ -1,4 +1,4 @@
-import { AnnotationTag } from '../core/types'
+import type { AnnotationTag } from '../core/types'
 import { coerceError } from '../internal/errors'
 import { getEscapeSequenceRegExp } from '../internal/escaping'
 import { createGlobalRegExp } from '../internal/regexps'

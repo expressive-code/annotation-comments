@@ -62,8 +62,7 @@ export type AnnotationTag = {
 	 */
 	name: string
 	/**
-	 * The optional target search query of the annotation,
-	 * located inside the annotation tag.
+	 * The optional target search query of the annotation, located inside the annotation tag.
 	 *
 	 * This query can be used to search for the target of the annotation.
 	 * It can be a string or a regular expression.
@@ -73,19 +72,21 @@ export type AnnotationTag = {
 	 */
 	targetSearchQuery?: string | RegExp | undefined
 	/**
-	 * The optional relative target range of the annotation,
-	 * located inside the annotation tag.
+	 * The optional relative target range of the annotation, located inside the annotation tag.
 	 *
-	 * This can be used to define the amount of lines or search query matches
-	 * targeted by the annotation, as well as the direction of targeting
-	 * (positive numbers target code after the annotation, negative numbers
-	 * target code before it).
+	 * If present, it determines how many lines or target search query matches before or after
+	 * the annotation are targeted.
 	 *
-	 * If the annotation shares a line with code, targeting starts on the same line.
-	 * Otherwise, it starts on the next line in the given direction.
+	 * If omitted, the annotation targets only 1 line or target search query match.
+	 * Depending on the location of the annotation, this may be above, below, or on the line
+	 * containing the annotation itself.
 	 *
-	 * Example: The annotation `// [!ins:3]` on its own line marks the next 3 lines
-	 * as inserted.
+	 * The following range types are supported:
+	 * - A **numeric range** defined by positive or negative numbers.
+	 *   Positive ranges extend downwards, negative ranges extend upwards from the location
+	 *   of the annotation. If the annotation shares a line with code, the range starts at this
+	 *   line. Otherwise, it starts at the first non-annotation line in the direction of the range.
+	 *   The special range `0` creates standalone annotations that do not target any code.
 	 */
 	relativeTargetRange?: number | undefined
 	rawTag: string

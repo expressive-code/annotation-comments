@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { parseAnnotationComments } from '../src/core/parse'
-import { createSingleLineRanges, createSingleLineRange } from '../src/internal/ranges'
+import { createSingleLineRange, createSingleLineRanges } from '../src/internal/ranges'
 import { createGlobalRegExp } from '../src/internal/regexps'
 import type { ExpectedAnnotationComment } from './utils'
 import { splitCodeLines, validateAnnotationComment } from './utils'
