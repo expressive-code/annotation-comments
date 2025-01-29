@@ -74,12 +74,6 @@
           }
         }
       }
-    },
-    {
-      "include": ["**/package.json"],
-      "formatter": {
-        "lineEnding": "lf"
-      }
     }
   ]
 }
