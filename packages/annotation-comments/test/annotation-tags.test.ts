@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { AnnotationTag } from '../src/core/types'
-import { parseAnnotationTags } from '../src/parsers/annotation-tags'
 import { createGlobalRegExp } from '../src/internal/regexps'
+import { parseAnnotationTags } from '../src/parsers/annotation-tags'
 import { splitCodeLines } from './utils'
 
 describe('parseAnnotationTags()', () => {

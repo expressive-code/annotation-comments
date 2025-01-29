@@ -9,7 +9,7 @@ export function createRange(options: { codeLines: string[]; start: SourceLocatio
 		start: { line: start.line },
 		end: { line: end.line },
 	}
-	if (start.column ?? 0 > 0) range.start.column = start.column
+	if ((start.column ?? 0) > 0) range.start.column = start.column
 	if (end.column && end.column < (codeLines[end.line] ?? '').length) range.end.column = end.column
 	return range
 }
@@ -128,7 +128,7 @@ export function mergeIntersectingOrAdjacentRanges(ranges: SourceRange[]): Source
 		// extend the current range if needed
 		if (
 			compareRanges(newRange, currentRange, 'start', 'end') <= 0 ||
-			(currentRange.end.line + 1 == newRange.start.line && currentRange.end.column === undefined && !newRange.start.column)
+			(currentRange.end.line + 1 === newRange.start.line && currentRange.end.column === undefined && !newRange.start.column)
 		) {
 			if (compareRanges(newRange, currentRange, 'end') > 0) currentRange.end = newRange.end
 			continue

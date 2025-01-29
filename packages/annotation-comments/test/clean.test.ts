@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import type { AnnotationComment } from '../src/core/types'
+import type { CleanCodeOptions } from '../src/core/clean'
+import { cleanCode } from '../src/core/clean'
 import { parseAnnotationComments } from '../src/core/parse'
-import { cleanCode, CleanCodeOptions } from '../src/core/clean'
+import type { AnnotationComment } from '../src/core/types'
 import { formatAnnotationComment, formatAnnotationComments, getArrayPermutations, splitCodeLines } from './utils'
 
 describe('cleanCode()', () => {

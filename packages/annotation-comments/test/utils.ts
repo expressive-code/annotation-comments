@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import type { AnnotationComment, AnnotationTag, SourceLocation, SourceRange } from '../src/core/types'
-import { createGlobalRegExp, findRegExpMatchColumnRanges } from '../src/internal/regexps'
 import { createRange, isEmptyRange } from '../src/internal/ranges'
+import { createGlobalRegExp, findRegExpMatchColumnRanges } from '../src/internal/regexps'
 
 export function splitCodeLines(code: string) {
 	return code.trim().split(/\r?\n/)
@@ -24,12 +24,12 @@ export function validateAnnotationComment(actual: AnnotationComment, codeLines: 
 			...expected.tag,
 		})
 	}
-	if (expected.contents) expect(actual.contents, 'Unexpected contents').toEqual(expected.contents)
-	if (expected.commentRange) expect(actual.commentRange, 'Unexpected commentRange').toEqual(expected.commentRange)
+	if (expected.contents) expect(actual.contents, `Unexpected contents of tag ${actual.tag.rawTag}`).toEqual(expected.contents)
+	if (expected.commentRange) expect(actual.commentRange, `Unexpected commentRange of tag ${actual.tag.rawTag}`).toEqual(expected.commentRange)
 	const expectedAnnotationRange = expected.annotationRange ?? expected.commentRange
-	if (expectedAnnotationRange) expect(actual.annotationRange, 'Unexpected annotationRange').toEqual(expectedAnnotationRange)
+	if (expectedAnnotationRange) expect(actual.annotationRange, `Unexpected annotationRange of tag ${actual.tag.rawTag}`).toEqual(expectedAnnotationRange)
 	const expectedTargetRanges = expected.targetRangeRegExp ? findRegExpTargetRanges(codeLines, createGlobalRegExp(expected.targetRangeRegExp)) : expected.targetRanges
-	if (expectedTargetRanges) expect(actual.targetRanges, 'Unexpected targetRanges').toEqual(expectedTargetRanges)
+	if (expectedTargetRanges) expect(actual.targetRanges, `Unexpected targetRanges of tag ${actual.tag.rawTag}`).toEqual(expectedTargetRanges)
 
 	if (expected.contents) {
 		const expectedContentRanges: SourceRange[] = []

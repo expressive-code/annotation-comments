@@ -8,12 +8,48 @@ export type CleanCodeOptions = AnnotatedCode & {
 	 * Its return value determines whether the annotation should be cleaned from the code.
 	 */
 	allowCleaning?: (context: CleanAnnotationContext) => boolean
+	/**
+	 * When encountering annotation comments that have additional contents after the annotation tag,
+	 * the default cleanup logic will remove the annotation tag, but keep the content.
+	 *
+	 * For example, `// [!note] Call the API` will become `// Call the API` after cleaning.
+	 *
+	 * Setting this option to `true` allows you to remove any contents as well. Alternatively,
+	 * you can provide a handler function to determine the behavior for each annotation comment
+	 * individually.
+	 *
+	 * In any case, if a comment becomes empty through cleaning, it will be removed entirely.
+	 *
+	 * @default false
+	 */
 	removeAnnotationContents?: boolean | ((context: CleanAnnotationContext) => boolean)
 	/**
 	 * Whether to update all ranges in the annotation comments after applying the changes.
+	 *
+	 * Set this to `true` if you want to use the code ranges for further processing after the code
+	 * has been cleaned, or to allow incremental cleaning of the code in multiple passes.
+	 *
+	 * @default false
 	 */
 	updateCodeRanges?: boolean
+	/**
+	 * If given, this handler function will be called during the cleanup process for each line
+	 * that is about to be removed from `codeLines`.
+	 *
+	 * The handler can return `true` to indicate that it has taken care of the change and that
+	 * the default logic (which edits the `codeLines` array in place) should be skipped.
+	 */
 	handleRemoveLine?: (context: HandleRemoveLineContext) => boolean
+	/**
+	 * If given, this handler function will be called during the cleanup process for each
+	 * inline edit that is about to performed in `codeLines`.
+	 *
+	 * The edit process replaces all text inside the column range from `startColumn` to `endColumn`
+	 * with `newText`.
+	 *
+	 * The handler can return `true` to indicate that it has taken care of the change and that
+	 * the default logic (which edits the `codeLines` array in place) should be skipped.
+	 */
 	handleEditLine?: (context: HandleEditLineContext) => boolean
 }
 
@@ -43,6 +79,15 @@ export type EditLine = {
 
 type SourceChange = RemoveLine | EditLine
 
+/**
+ * Prepares annotated code lines for display or copying to the clipboard by removing metadata
+ * like annotation tags and optionally annotation comment contents, making the resulting code
+ * look like regular (non-annotated) code again.
+ *
+ * The function will collect all necessary edits and apply them to the code in reverse order
+ * (from the last edit location to the first) to avoid having to continuously update the locations
+ * of all remaining edits.
+ */
 export function cleanCode(options: CleanCodeOptions) {
 	const { codeLines, annotationComments, removeAnnotationContents = false, updateCodeRanges = true, handleRemoveLine, handleEditLine } = options
 
@@ -148,7 +193,7 @@ function updateCodeRanges(ranges: SourceRange[], change: RemoveLine | EditLine) 
 	}
 }
 
-export function updateCodeRange(range: SourceRange, change: RemoveLine | EditLine) {
+function updateCodeRange(range: SourceRange, change: RemoveLine | EditLine) {
 	const { start, end } = range
 	const changeLine = change.lineIndex
 	if (change.editType === 'removeLine') {
@@ -200,11 +245,10 @@ function getRangeRemovalChanges(codeLines: string[], range: SourceRange): Source
 				endColumn,
 				newText: '',
 			}
-		} else {
-			return {
-				editType: 'removeLine',
-				lineIndex,
-			}
+		}
+		return {
+			editType: 'removeLine',
+			lineIndex,
 		}
 	})
 }
