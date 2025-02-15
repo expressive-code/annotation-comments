@@ -1,6 +1,6 @@
 {
   "name": "annotation-comments",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "A library to parse and manipulate annotation comments in code.",
   "keywords": [],
   "author": "Tibor Schiemann",
@@ -19,7 +19,9 @@
     }
   },
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup ./src/index.ts --format esm --no-splitting --dts --sourcemap --clean",
     "coverage": "vitest run --coverage --coverage.include=src/**/*.ts --coverage.exclude=src/index.ts",
