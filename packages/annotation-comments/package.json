@@ -19,9 +19,7 @@
     }
   },
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup ./src/index.ts --format esm --no-splitting --dts --sourcemap --clean",
     "coverage": "vitest run --coverage --coverage.include=src/**/*.ts --coverage.exclude=src/index.ts",
