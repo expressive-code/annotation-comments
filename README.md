@@ -1,9 +1,5 @@
 # annotation-comments
 
-> **Warning**: ⚠ This repository has just been made public and is still a work in progress. The documentation and code quality will be improved in the near future.
->
-> As the API has not been finalized yet, we recommend waiting until this notice has been removed before attempting to use this package or contributing to it.
-
 This library provides functionality to parse and extract annotation comments from code snippets.
 
 Annotation comments allow authors to annotate pieces of source code with additional information (e.g. marking important lines, highlighting changes, adding notes, and more) while keeping it readable and functional:

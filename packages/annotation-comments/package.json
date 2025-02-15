@@ -25,7 +25,7 @@
     "coverage": "vitest run --coverage --coverage.include=src/**/*.ts --coverage.exclude=src/index.ts",
     "test": "vitest run",
     "test-short": "vitest run --reporter basic",
-    "test-watch": "vitest --reporter verbose",
+    "test-watch": "vitest",
     "watch": "pnpm build --watch src"
   }
 }

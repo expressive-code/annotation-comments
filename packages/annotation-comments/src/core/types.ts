@@ -87,8 +87,11 @@ export type AnnotationTag = {
 	 *   of the annotation. If the annotation shares a line with code, the range starts at this
 	 *   line. Otherwise, it starts at the first non-annotation line in the direction of the range.
 	 *   The special range `0` creates standalone annotations that do not target any code.
+	 * - A **range between two matching annotations** defined by the keywords `start` and `end`,
+	 *   e.g. `// [!ins:start]`, followed by some code lines, and a matching `// [!ins:end]`
+	 *   to mark the end of the inserted code.
 	 */
-	relativeTargetRange?: number | undefined
+	relativeTargetRange?: number | 'start' | 'end' | undefined
 	rawTag: string
 	/**
 	 * The tag's range within the parsed source code.

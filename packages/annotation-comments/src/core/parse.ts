@@ -81,7 +81,8 @@ export function parseAnnotationComments(options: ParseAnnotationCommentsOptions)
 	})
 
 	// Find the target ranges for all annotations
-	findAnnotationTargets({ codeLines, annotationComments })
+	const findTargetErrors = findAnnotationTargets({ codeLines, annotationComments })
+	if (findTargetErrors.length) errorMessages.push(...findTargetErrors)
 
 	return {
 		annotationComments,
