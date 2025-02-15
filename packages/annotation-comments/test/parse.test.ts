@@ -743,6 +743,190 @@ countdown(9) // This one is out of the target range
 				])
 			})
 		})
+		describe('Tag pair defining a start...end target range', () => {
+			test('[!tag:start] ... [!tag:end] targets all non-annotation comment lines inbetween', () => {
+				const codeLines = [
+					`fail`,
+					`// [!mark:start]`,
+					`console.log('This line will be marked.')`,
+					`console.log('This one, too.')`,
+					// Empty lines in the range are also targeted
+					``,
+					`console.log('This one, too.')`,
+					// But annotation lines are not
+					`// [!ins:1]`,
+					`console.log('And this one.')`,
+					`// [!mark:end]`,
+					`fail`,
+				]
+				validateParsedComments(codeLines, [
+					{
+						tag: { name: 'mark', relativeTargetRange: 'start' },
+						targetRanges: createSingleLineRanges(2, 3, 4, 5, 7),
+					},
+					{
+						tag: { name: 'ins', relativeTargetRange: 1 },
+						targetRanges: createSingleLineRanges(7),
+					},
+					{
+						tag: { name: 'mark', relativeTargetRange: 'end' },
+						targetRanges: [],
+					},
+				])
+			})
+			test('Range start/end tags at the end of non-empty lines include these lines in the range', () => {
+				const codeLines = [
+					`fail`,
+					`console.log('This line will be marked.') // [!mark:start]`,
+					`console.log('This one, too.')`,
+					// Empty lines in the range are also targeted
+					``,
+					`console.log('This one, too.')`,
+					// But annotation lines are not
+					`// [!ins:1]`,
+					`console.log('And this one.') // [!mark:end]`,
+					`fail`,
+				]
+				validateParsedComments(codeLines, [
+					{
+						tag: { name: 'mark', relativeTargetRange: 'start' },
+						targetRanges: createSingleLineRanges(1, 2, 3, 4, 6),
+					},
+					{
+						tag: { name: 'ins', relativeTargetRange: 1 },
+						targetRanges: createSingleLineRanges(6),
+					},
+					{
+						tag: { name: 'mark', relativeTargetRange: 'end' },
+						targetRanges: [],
+					},
+				])
+			})
+			test('Range start/end tags at the beginning of non-empty lines include these lines in the range', () => {
+				const codeLines = [
+					`fail`,
+					`/* [!mark:start] */ console.log('This line will be marked.')`,
+					`console.log('This one, too.')`,
+					// Empty lines in the range are also targeted
+					``,
+					`console.log('This one, too.')`,
+					// But annotation lines are not
+					`// [!ins:1]`,
+					`/* [!mark:end] */ console.log('And this one.')`,
+					`fail`,
+				]
+				validateParsedComments(codeLines, [
+					{
+						tag: { name: 'mark', relativeTargetRange: 'start' },
+						targetRanges: createSingleLineRanges(1, 2, 3, 4, 6),
+					},
+					{
+						tag: { name: 'ins', relativeTargetRange: 1 },
+						targetRanges: createSingleLineRanges(6),
+					},
+					{
+						tag: { name: 'mark', relativeTargetRange: 'end' },
+						targetRanges: [],
+					},
+				])
+			})
+			test('Keyword "begin" is automatically converted to "start"', () => {
+				const codeLines = [
+					`fail`,
+					`// [!mark:begin]`,
+					`console.log('This line will be marked.')`,
+					`console.log('This one, too.')`,
+					// Empty lines in the range are also targeted
+					``,
+					`console.log('This one, too.')`,
+					// But annotation lines are not
+					`// [!ins:1]`,
+					`console.log('And this one.')`,
+					`// [!mark:end]`,
+					`fail`,
+				]
+				validateParsedComments(codeLines, [
+					{
+						tag: { name: 'mark', relativeTargetRange: 'start' },
+						targetRanges: createSingleLineRanges(2, 3, 4, 5, 7),
+					},
+					{
+						tag: { name: 'ins', relativeTargetRange: 1 },
+						targetRanges: createSingleLineRanges(7),
+					},
+					{
+						tag: { name: 'mark', relativeTargetRange: 'end' },
+						targetRanges: [],
+					},
+				])
+			})
+			test('Matching start...end ranges can be nested', () => {
+				const codeLines = [
+					`fail`,
+					`// [!collapse:start] This is the outer collapse`,
+					`console.log('This line will be marked.')`,
+					`console.log('This one, too.')`,
+					`// [!collapse:start] And this is the inner one`,
+					`console.log('And this one.')`,
+					`console.log('This one, too.')`,
+					`// [!collapse:end]`,
+					`console.log('And this one.')`,
+					`// [!collapse:end]`,
+					`fail`,
+				]
+				validateParsedComments(codeLines, [
+					{
+						tag: { name: 'collapse', relativeTargetRange: 'start' },
+						targetRanges: createSingleLineRanges(2, 3, 5, 6, 8),
+					},
+					{
+						tag: { name: 'collapse', relativeTargetRange: 'start' },
+						targetRanges: createSingleLineRanges(5, 6),
+					},
+					{
+						tag: { name: 'collapse', relativeTargetRange: 'end' },
+						targetRanges: [],
+					},
+					{
+						tag: { name: 'collapse', relativeTargetRange: 'end' },
+						targetRanges: [],
+					},
+				])
+			})
+			test('Different start...end ranges can overlap', () => {
+				const codeLines = [
+					`fail`,
+					`// [!mark:start]`,
+					`console.log('This line will be marked.')`,
+					`console.log('This one, too.')`,
+					`// [!collapse:start]`,
+					`console.log('And this one.')`,
+					`console.log('This one, too.')`,
+					`// [!mark:end]`,
+					`console.log('And this one.')`,
+					`// [!collapse:end]`,
+					`fail`,
+				]
+				validateParsedComments(codeLines, [
+					{
+						tag: { name: 'mark', relativeTargetRange: 'start' },
+						targetRanges: createSingleLineRanges(2, 3, 5, 6),
+					},
+					{
+						tag: { name: 'collapse', relativeTargetRange: 'start' },
+						targetRanges: createSingleLineRanges(5, 6, 8),
+					},
+					{
+						tag: { name: 'mark', relativeTargetRange: 'end' },
+						targetRanges: [],
+					},
+					{
+						tag: { name: 'collapse', relativeTargetRange: 'end' },
+						targetRanges: [],
+					},
+				])
+			})
+		})
 		describe('Tag with a target search query', () => {
 			test('[!tag:<search term>] at the end of a non-empty line starts searching at the current line', () => {
 				const codeLines = [
@@ -1214,6 +1398,70 @@ countdown(9) // This one is out of the target range
 					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/, relativeTargetRange: -3 }, targetRangeRegExp: /target3/ },
 					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/, relativeTargetRange: -3 }, targetRangeRegExp: /target4/ },
 					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/, relativeTargetRange: -3 }, targetRangeRegExp: /target5/ },
+				])
+			})
+		})
+		describe('Tag pair with target search query and start...end target range', () => {
+			test('[!tag:<search term>:start] ... [!tag:<search term>:end] targets all matches inbetween', () => {
+				const codeLines = [
+					`fail`,
+					`// [!mark:/(target.|fail)/:start]`,
+					`target1`,
+					`no match`,
+					`target1`,
+					`target1`,
+					`// [!mark:/(target.|fail)/:end]`,
+					`fail`,
+					``,
+					`fail`,
+					`// [!note:/(target.|fail)/:start] This adds a note to each match.`,
+					`no match`,
+					`target2`,
+					`no match`,
+					`target2`,
+					`target2`,
+					`// [!note:/(target.|fail)/:end]`,
+					`fail`,
+					``,
+					`fail`,
+					`/* [!note:/(target.|fail)/:start] The language's multi-line comment syntax`,
+					`   can be used. Potential matches like "target" or "fail" are skipped`,
+					`   inside annotation comments. */`,
+					``,
+					`target3`,
+					`no match`,
+					`target3`,
+					`target3`,
+					`/* [!note:/(target.|fail)/:end] */`,
+					`fail`,
+					``,
+					`fail`,
+					`/*`,
+					`  [!note:/(target.|fail)/:start]`,
+					`    Whitespace inside the comments does not matter,`,
+					`    allowing you to use any formatting you like.`,
+					`*/`,
+					``,
+					`target4`,
+					`target4`,
+					`no match`,
+					`target4`,
+					`// [!note:/(target.|fail)/:end]`,
+					`fail`,
+					``,
+				]
+				validateParsedComments(codeLines, [
+					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 'start' }, targetRangeRegExp: /.*target1/ },
+					{ tag: { name: 'mark', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 'end' }, targetRanges: [] },
+
+					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 'start' }, targetRangeRegExp: /.*target2/ },
+					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 'end' }, targetRanges: [] },
+
+					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 'start' }, targetRangeRegExp: /.*target3/ },
+					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 'end' }, targetRanges: [] },
+
+					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 'start' }, targetRangeRegExp: /.*target4/ },
+					{ tag: { name: 'note', targetSearchQuery: /(target.|fail)/, relativeTargetRange: 'end' }, targetRanges: [] },
 				])
 			})
 		})

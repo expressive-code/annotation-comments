@@ -1,9 +1,17 @@
+import { coerceError } from '../internal/errors'
 import { compareRanges, createSingleLineRange } from '../internal/ranges'
 import { findSearchQueryMatchesInLine, getFirstNonAnnotationCommentLineContents, getNonAnnotationCommentLineContents } from '../internal/text-content'
-import type { AnnotatedCode, AnnotationComment } from './types'
+import type { AnnotatedCode, AnnotationComment, AnnotationTag } from './types'
 
-export function findAnnotationTargets(annotatedCode: AnnotatedCode) {
+/**
+ * Attempts to find the targets of all annotations in the given annotated code.
+ *
+ * Returns an array of error messages that occurred during the search.
+ */
+export function findAnnotationTargets(annotatedCode: AnnotatedCode): string[] {
 	const { annotationComments } = annotatedCode
+	const matchedEndTags = new Set<AnnotationTag>()
+	const errorMessages: string[] = []
 
 	annotationComments.forEach((comment) => {
 		const { tag, commentRange, targetRanges } = comment
@@ -16,17 +24,24 @@ export function findAnnotationTargets(annotatedCode: AnnotatedCode) {
 		const commentLineContents = getNonAnnotationCommentLineContents(commentLineIndex, annotatedCode)
 		const { relativeTargetRange, targetSearchQuery } = tag
 
-		if (targetSearchQuery === undefined) {
-			// Handle annotations without a target search query (they target full lines)
-			findFullLineTargetRanges({ annotatedCode, comment, commentLineContents, commentLineIndex })
-		} else {
-			// A target search query is present, so we need to search for target ranges
-			findInlineTargetRanges({ annotatedCode, comment, commentLineContents, commentLineIndex })
+		try {
+			if (targetSearchQuery === undefined) {
+				// Handle annotations without a target search query (they target full lines)
+				findFullLineTargetRanges({ annotatedCode, comment, commentLineContents, commentLineIndex, matchedEndTags })
+			} else {
+				// A target search query is present, so we need to search for target ranges
+				findInlineTargetRanges({ annotatedCode, comment, commentLineContents, commentLineIndex, matchedEndTags })
+			}
+		} catch (error) {
+			const errorMessage = coerceError(error).message
+			errorMessages.push(`Error while processing annotation tag ${comment.tag.rawTag} in line ${comment.tag.range.start.line + 1}: ${errorMessage}`)
 		}
 
 		// In case of a negative direction, fix the potentially mixed up order of target ranges
 		if (typeof relativeTargetRange === 'number' && relativeTargetRange < 0) targetRanges.sort((a, b) => compareRanges(a, b, 'start'))
 	})
+
+	return errorMessages
 }
 
 function findFullLineTargetRanges(options: {
@@ -34,12 +49,14 @@ function findFullLineTargetRanges(options: {
 	comment: AnnotationComment
 	commentLineContents: ReturnType<typeof getNonAnnotationCommentLineContents>
 	commentLineIndex: number
+	matchedEndTags: Set<AnnotationTag>
 }) {
 	const {
 		annotatedCode,
 		comment: { tag, targetRanges },
 		commentLineContents,
 		commentLineIndex,
+		matchedEndTags,
 	} = options
 	const { relativeTargetRange } = tag
 
@@ -82,7 +99,18 @@ function findFullLineTargetRanges(options: {
 		}
 	}
 
-	// TODO: Handle relative target ranges `start` and `end` for full-line annotations
+	// Handle relative target ranges defined by matching `start` and `end` annotations
+	const startEndRange = handleStartEndTargetRange({ annotatedCode, tag, commentLineIndex, matchedEndTags })
+	if (startEndRange?.endAnnotation) {
+		const rangeStart = commentLineContents.hasNonWhitespaceContent ? commentLineIndex : commentLineIndex + 1
+		const rangeEnd = startEndRange.endAnnotation.commentRange.start.line
+		for (let lineIndex = rangeStart; lineIndex <= rangeEnd; lineIndex++) {
+			const lineContents = getNonAnnotationCommentLineContents(lineIndex, annotatedCode)
+			if (lineContents.contentRanges.length) {
+				targetRanges.push(createSingleLineRange(lineIndex))
+			}
+		}
+	}
 }
 
 function findInlineTargetRanges(options: {
@@ -90,12 +118,14 @@ function findInlineTargetRanges(options: {
 	comment: AnnotationComment
 	commentLineContents: ReturnType<typeof getNonAnnotationCommentLineContents>
 	commentLineIndex: number
+	matchedEndTags: Set<AnnotationTag>
 }) {
 	const {
 		annotatedCode,
 		comment: { tag, targetRanges },
 		commentLineContents,
 		commentLineIndex,
+		matchedEndTags,
 	} = options
 	const { targetSearchQuery } = tag
 	let { relativeTargetRange } = tag
@@ -143,5 +173,82 @@ function findInlineTargetRanges(options: {
 		}
 	}
 
-	// TODO: Handle relative target ranges `start` and `end` for inline search queries
+	// Handle relative target ranges defined by matching `start` and `end` annotations
+	const startEndRange = handleStartEndTargetRange({ annotatedCode, tag, commentLineIndex, matchedEndTags })
+	if (startEndRange?.endAnnotation) {
+		const rangeStart = commentLineContents.hasNonWhitespaceContent ? commentLineIndex : commentLineIndex + 1
+		const rangeEnd = startEndRange.endAnnotation.commentRange.start.line
+		for (let lineIndex = rangeStart; lineIndex <= rangeEnd; lineIndex++) {
+			// Search all ranges of the line that are not part of an annotation comment
+			// for matches of the target search query
+			const matches = findSearchQueryMatchesInLine(lineIndex, targetSearchQuery, annotatedCode)
+			matches.forEach((match) => targetRanges.push(match))
+		}
+	}
+}
+
+/**
+ * Handles relative target ranges defined by a matching `start`...`end` tag pair.
+ *
+ * Returns an object if the tag is part of a pair, or `undefined` otherwise.
+ * If the tag is the start of a pair, the object also contains the matching end annotation.
+ *
+ * Throws an error when encountering unmatched `start` or `end` tags on their own.
+ */
+function handleStartEndTargetRange(options: {
+	annotatedCode: AnnotatedCode
+	tag: AnnotationTag
+	commentLineIndex: number
+	matchedEndTags: Set<AnnotationTag>
+}): { endAnnotation?: AnnotationComment | undefined } | undefined {
+	const { tag, matchedEndTags } = options
+	if (tag.relativeTargetRange === 'start') {
+		const endAnnotation = findTargetRangeEndAnnotation(options)
+		if (!endAnnotation) throw new Error(`Failed to find a matching end tag, expected "${tag.rawTag.replace(/:\w+\]$/, ':end]')}".`)
+		matchedEndTags.add(endAnnotation.tag)
+		return { endAnnotation }
+	}
+	if (tag.relativeTargetRange === 'end') {
+		if (!matchedEndTags.has(tag)) throw new Error('This end tag does not have a matching start tag.')
+		return {}
+	}
+}
+
+function findTargetRangeEndAnnotation(options: {
+	annotatedCode: AnnotatedCode
+	tag: AnnotationTag
+	commentLineIndex: number
+	matchedEndTags: Set<AnnotationTag>
+}) {
+	const { annotatedCode, tag, commentLineIndex, matchedEndTags } = options
+
+	// Determine all matching range annotations below the start tag
+	// (both start and end are allowed to support nested ranges)
+	const matchFn = (input: AnnotationComment) => !matchedEndTags.has(input.tag) && input.commentRange.start.line > commentLineIndex && isMatchingRangeTag(tag, input.tag)
+	const matchingAnnotationsBelow = annotatedCode.annotationComments.filter(matchFn)
+	if (matchingAnnotationsBelow.length === 0) return
+
+	// Go through the matching annotations in order of appearance, keep track of the nesting level,
+	// and return the first end tag on the same level as the start tag
+	matchingAnnotationsBelow.sort((a, b) => compareRanges(a.commentRange, b.commentRange, 'start'))
+	let nestingLevel = 0
+	for (const annotation of matchingAnnotationsBelow) {
+		if (annotation.tag.relativeTargetRange === 'start') {
+			nestingLevel++
+			continue
+		}
+		if (nestingLevel === 0) return annotation
+		nestingLevel--
+	}
+}
+
+function isMatchingRangeTag(a: AnnotationTag, b: AnnotationTag) {
+	if (b.name !== a.name) return false
+	if (!isRangeTag(a) || !isRangeTag(b)) return false
+	const getRawQuery = (query: AnnotationTag['targetSearchQuery']) => (query instanceof RegExp ? query.source : query)
+	return getRawQuery(b.targetSearchQuery) === getRawQuery(a.targetSearchQuery)
+}
+
+function isRangeTag(tag: AnnotationTag) {
+	return tag.relativeTargetRange === 'start' || tag.relativeTargetRange === 'end'
 }
