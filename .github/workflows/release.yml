@@ -1,4 +1,5 @@
 name: Release
+permissions: {}
 
 on:
   push:
@@ -13,28 +14,34 @@ jobs:
     name: Release
     if: github.repository_owner == 'expressive-code'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          node-version: 20
+          persist-credentials: false
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: 24
           cache: 'pnpm'
-
+      
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
+      
       - name: Check for unreleased changesets
         id: has-changesets
-        uses: andstor/file-existence-action@v2
+        uses: andstor/file-existence-action@076e0072799f4942c8bc574a82233e1e4d13e9d6 # v3.0.0
         with:
           files: ".changeset/!(README).md"
-
+      
       # If there are unreleased changesets, validate the project before creating the changesets PR
       - name: Require build, test and lint to pass
         if: steps.has-changesets.outputs.files_exists == 'true'
@@ -42,14 +49,13 @@ jobs:
           pnpm build
           pnpm test
           pnpm lint
-
+      
       # Run changesets action either if there are unreleased changesets (= a PR must be created)
       # or if the commit message matches the release PR (= new versions must be published to NPM)
-      # or if the workflow was triggered manually through `workflow_dispatch`
       - name: Create changesets PR or publish to NPM
         id: changesets
         if: steps.has-changesets.outputs.files_exists == 'true' || startsWith(github.event.head_commit.message, '[CI] Release') || github.event_name == 'workflow_dispatch'
-        uses: changesets/action@v1
+        uses: changesets/action@e0145edc7d9d8679003495b11f87bd8ef63c0cba # v1.5.3
         with:
           title: '[CI] Release'
           commit: '[CI] Release'
@@ -57,4 +63,4 @@ jobs:
           publish: 'pnpm ci-publish'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: "" # See https://github.com/changesets/changesets/issues/1152#issuecomment-3190884868
